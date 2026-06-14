@@ -162,6 +162,7 @@ pub struct Table {
     striped: bool,
     stripe_style: Style,
     title: Option<Text>,
+    title_style: Style,
     pad: u16,
     row_separators: bool,
 }
@@ -179,6 +180,7 @@ impl Default for Table {
             striped: false,
             stripe_style: Style::new().dim(),
             title: None,
+            title_style: theme.heading,
             pad: 1,
             row_separators: false,
         }
@@ -244,6 +246,13 @@ impl Table {
         self
     }
 
+    /// Sets the border glyph style (e.g. its color).
+    #[must_use]
+    pub fn border_style(mut self, style: Style) -> Self {
+        self.border_style = style;
+        self
+    }
+
     /// Enables or disables the header row.
     #[must_use]
     pub fn header(mut self, show: bool) -> Self {
@@ -251,10 +260,31 @@ impl Table {
         self
     }
 
+    /// Sets the header row text style.
+    #[must_use]
+    pub fn header_style(mut self, style: Style) -> Self {
+        self.header_style = style;
+        self
+    }
+
     /// Enables zebra striping of body rows.
     #[must_use]
     pub fn striped(mut self, striped: bool) -> Self {
         self.striped = striped;
+        self
+    }
+
+    /// Sets the style (e.g. background) used for striped rows.
+    #[must_use]
+    pub fn stripe_style(mut self, style: Style) -> Self {
+        self.stripe_style = style;
+        self
+    }
+
+    /// Sets the title text style.
+    #[must_use]
+    pub fn title_style(mut self, style: Style) -> Self {
+        self.title_style = style;
         self
     }
 
@@ -441,7 +471,7 @@ impl<'a> Builder<'a> {
             title_line,
             width,
             Align::Center,
-            self.table.header_style,
+            self.table.title_style,
         ));
     }
 

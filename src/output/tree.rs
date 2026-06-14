@@ -77,6 +77,13 @@ impl Tree {
         self
     }
 
+    /// Sets the number of horizontal dashes in each connector (default 1).
+    #[must_use]
+    pub fn dashes(mut self, dashes: u16) -> Self {
+        self.dashes = dashes;
+        self
+    }
+
     /// Disables the vertical continuation guides.
     #[must_use]
     pub fn no_guides(mut self) -> Self {
