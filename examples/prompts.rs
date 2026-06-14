@@ -20,7 +20,7 @@ macro_rules! get {
     ($prompt:expr) => {
         match $prompt {
             Outcome::Submitted(value) => value,
-            Outcome::Cancelled => return cancelled(),
+            _ => return cancelled(),
         }
     };
 }

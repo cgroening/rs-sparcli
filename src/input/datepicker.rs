@@ -37,6 +37,20 @@ impl Date {
         Self { year, month, day }
     }
 
+    /// The "no date" sentinel (all fields zero).
+    pub fn empty() -> Self {
+        Self {
+            year: 0,
+            month: 0,
+            day: 0,
+        }
+    }
+
+    /// Returns `true` if this is the "no date" sentinel.
+    pub fn is_empty(self) -> bool {
+        self.year == 0 && self.month == 0 && self.day == 0
+    }
+
     /// Returns today's local-free (UTC) date, or 1970-01-01 on failure.
     pub fn today() -> Self {
         let days = SystemTime::now()
@@ -120,6 +134,7 @@ fn is_leap(year: i32) -> bool {
 pub struct DatePicker {
     prompt: String,
     initial: Date,
+    allow_clear: bool,
 }
 
 impl DatePicker {
@@ -128,6 +143,7 @@ impl DatePicker {
         Self {
             prompt: prompt.into(),
             initial: Date::today(),
+            allow_clear: false,
         }
     }
 
@@ -135,6 +151,16 @@ impl DatePicker {
     #[must_use]
     pub fn initial(mut self, date: Date) -> Self {
         self.initial = date;
+        self
+    }
+
+    /// Allows Delete/Backspace to clear the selection to "no date".
+    ///
+    /// A cleared selection submits [`Date::empty`]; check it with
+    /// [`Date::is_empty`].
+    #[must_use]
+    pub fn allow_clear(mut self) -> Self {
+        self.allow_clear = true;
         self
     }
 
@@ -155,17 +181,54 @@ impl DatePicker {
     /// Runs the picker against any event source (used for tests).
     fn run_with(&self, source: &mut impl EventSource) -> Result<Outcome<Date>> {
         let mut current = self.initial;
-        run_prompt(source, &mut current, |date, _| self.render(*date), handle)
+        run_prompt(
+            source,
+            &mut current,
+            |date, _| self.render(*date),
+            |date, event| self.handle(date, event),
+        )
     }
 
     /// Builds the calendar frame for the selected date.
     fn render(&self, selected: Date) -> Rendered {
         let theme = theme();
         let mut lines = vec![Line::styled(self.prompt.clone(), theme.title)];
+        if selected.is_empty() {
+            lines.push(Line::styled(
+                "(no date) — press an arrow to choose".to_string(),
+                theme.secondary,
+            ));
+            return Rendered::new(lines);
+        }
         lines.push(header_line(selected, &theme));
         lines.push(weekday_header(&theme));
         lines.extend(month_grid(selected, &theme));
         Rendered::new(lines)
+    }
+
+    /// Handles one event for the picker.
+    fn handle(&self, date: &mut Date, event: InputEvent) -> Flow<Date> {
+        let InputEvent::Key(key) = event else {
+            return Flow::Continue;
+        };
+        if matches!(key.code, KeyCode::Esc) {
+            return Flow::Cancel;
+        }
+        if matches!(key.code, KeyCode::Enter) {
+            return Flow::Submit(*date);
+        }
+        if self.allow_clear
+            && matches!(key.code, KeyCode::Delete | KeyCode::Backspace)
+        {
+            *date = Date::empty();
+            return Flow::Continue;
+        }
+        if date.is_empty() {
+            // Any navigation key starts editing from today.
+            *date = Date::today();
+            return Flow::Continue;
+        }
+        apply_key(date, key)
     }
 }
 
@@ -235,19 +298,9 @@ fn month_name(month: u32) -> &'static str {
         .unwrap_or("?")
 }
 
-/// Handles one event for the date picker.
-fn handle(date: &mut Date, event: InputEvent) -> Flow<Date> {
-    let InputEvent::Key(key) = event else {
-        return Flow::Continue;
-    };
-    apply_key(date, key)
-}
-
-/// Applies a key press to the selected date.
+/// Applies a navigation key press to the selected (non-empty) date.
 fn apply_key(date: &mut Date, key: KeyPress) -> Flow<Date> {
     match key.code {
-        KeyCode::Esc => return Flow::Cancel,
-        KeyCode::Enter => return Flow::Submit(*date),
         KeyCode::Left => *date = date.add_days(-1),
         KeyCode::Right => *date = date.add_days(1),
         KeyCode::Up => *date = date.add_days(-7),
@@ -308,5 +361,48 @@ mod tests {
             .run_with(&mut ScriptedSource::keys([KeyCode::Esc]))
             .unwrap();
         assert_eq!(outcome, Outcome::Cancelled);
+    }
+
+    #[test]
+    fn allow_clear_submits_empty_date() {
+        let outcome = DatePicker::new("when")
+            .allow_clear()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::Delete,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        match outcome {
+            Outcome::Submitted(date) => assert!(date.is_empty()),
+            _ => panic!("expected an empty date"),
+        }
+    }
+
+    #[test]
+    fn delete_is_ignored_without_allow_clear() {
+        let outcome = DatePicker::new("when")
+            .initial(Date::new(2026, 6, 14))
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::Delete,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(Date::new(2026, 6, 14)));
+    }
+
+    #[test]
+    fn arrow_resumes_from_today_after_clear() {
+        let outcome = DatePicker::new("when")
+            .allow_clear()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::Delete,
+                KeyCode::Right,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        match outcome {
+            Outcome::Submitted(date) => assert!(!date.is_empty()),
+            _ => panic!("expected a date"),
+        }
     }
 }

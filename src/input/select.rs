@@ -12,6 +12,7 @@ use crate::input::event::{
 };
 use crate::input::guard::TerminalGuard;
 use crate::input::prompt::{Flow, run_prompt};
+use crate::input::shortcut::{self, Shortcut};
 
 /// Default number of visible rows.
 const DEFAULT_VISIBLE: usize = 10;
@@ -21,6 +22,7 @@ struct State {
     cursor: usize,
     checked: Vec<bool>,
     offset: usize,
+    help: bool,
 }
 
 /// A scrollable selection list (single or multi).
@@ -30,6 +32,7 @@ pub struct Select {
     multi: bool,
     max_visible: usize,
     cycle: bool,
+    shortcuts: Vec<Shortcut>,
 }
 
 impl Select {
@@ -41,7 +44,20 @@ impl Select {
             multi: false,
             max_visible: DEFAULT_VISIBLE,
             cycle: true,
+            shortcuts: Vec::new(),
         }
+    }
+
+    /// Registers shortcuts shown in a footer hint and the `?` help overlay.
+    ///
+    /// Pressing a bound key ends the prompt with [`Outcome::Shortcut`].
+    #[must_use]
+    pub fn shortcuts<I>(mut self, shortcuts: I) -> Self
+    where
+        I: IntoIterator<Item = Shortcut>,
+    {
+        self.shortcuts = shortcuts.into_iter().collect();
+        self
     }
 
     /// Adds options from any string iterator.
@@ -89,6 +105,7 @@ impl Select {
                 .copied()
                 .map_or(Outcome::Cancelled, Outcome::Submitted),
             Outcome::Cancelled => Outcome::Cancelled,
+            Outcome::Shortcut(id) => Outcome::Shortcut(id),
         })
     }
 
@@ -123,6 +140,7 @@ impl Select {
             cursor: 0,
             checked: vec![false; self.options.len()],
             offset: 0,
+            help: false,
         };
         run_prompt(
             source,
@@ -135,10 +153,16 @@ impl Select {
     /// Builds the prompt frame with the visible window of options.
     fn render(&self, state: &State) -> Rendered {
         let theme = theme();
+        if state.help {
+            return Rendered::new(shortcut::help_overlay(&self.shortcuts));
+        }
         let mut lines = vec![Line::styled(self.prompt.clone(), theme.title)];
         let end = (state.offset + self.max_visible).min(self.options.len());
         for index in state.offset..end {
             lines.push(self.option_line(state, index, &theme));
+        }
+        if !self.shortcuts.is_empty() {
+            lines.push(shortcut::hint_line(&self.shortcuts));
         }
         Rendered::new(lines)
     }
@@ -179,6 +203,17 @@ impl Select {
 
     /// Handles a single key press.
     fn handle_key(&self, state: &mut State, key: KeyPress) -> Flow<Vec<usize>> {
+        if state.help {
+            state.help = false;
+            return Flow::Continue;
+        }
+        if key.code == KeyCode::Char('?') && !self.shortcuts.is_empty() {
+            state.help = true;
+            return Flow::Continue;
+        }
+        if let Some(id) = shortcut::find(key, &self.shortcuts) {
+            return Flow::Shortcut(id);
+        }
         match key.code {
             KeyCode::Esc => return Flow::Cancel,
             KeyCode::Enter => return Flow::Submit(self.collect(state)),
@@ -283,6 +318,35 @@ mod tests {
             ]))
             .unwrap();
         assert_eq!(outcome, Outcome::Submitted(vec![0, 2]));
+    }
+
+    #[test]
+    fn shortcut_ends_with_its_id() {
+        use crate::input::event::{InputEvent, KeyPress};
+        let outcome = select()
+            .shortcuts([Shortcut::new(KeyPress::ctrl('n'), 7, "new")])
+            .run_with(&mut ScriptedSource::events([InputEvent::Key(
+                KeyPress::ctrl('n'),
+            )]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Shortcut(7));
+    }
+
+    #[test]
+    fn help_overlay_opens_and_closes() {
+        let outcome = select()
+            .shortcuts([Shortcut::new(
+                crate::input::event::KeyPress::ctrl('n'),
+                1,
+                "new",
+            )])
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::Char('?'),
+                KeyCode::Char('x'),
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![0]));
     }
 
     #[test]

@@ -88,6 +88,7 @@ pub struct Cell {
     content: Text,
     align: Option<Align>,
     colspan: usize,
+    rowspan: usize,
 }
 
 impl Cell {
@@ -97,6 +98,7 @@ impl Cell {
             content: content.into(),
             align: None,
             colspan: 1,
+            rowspan: 1,
         }
     }
 
@@ -111,6 +113,16 @@ impl Cell {
     #[must_use]
     pub fn colspan(mut self, columns: usize) -> Self {
         self.colspan = columns.max(1);
+        self
+    }
+
+    /// Spans this cell across `rows` rows.
+    ///
+    /// Cells in the rows below skip the spanned column(s); content sits in the
+    /// top row. Best paired with the default (no row separators).
+    #[must_use]
+    pub fn rowspan(mut self, rows: usize) -> Self {
+        self.rowspan = rows.max(1);
         self
     }
 }
@@ -273,42 +285,101 @@ impl Renderable for Table {
         if self.columns.is_empty() {
             return Rendered::empty();
         }
-        let widths = self.column_widths();
-        Builder::new(self, &widths).build()
+        let plan = build_plan(&self.rows, self.columns.len());
+        let widths = self.column_widths(&plan);
+        Builder::new(self, &widths, &plan).build()
     }
 }
 
 impl Table {
-    /// Computes the display width of each column.
-    fn column_widths(&self) -> Vec<usize> {
+    /// Computes the display width of each column from the placement plan.
+    fn column_widths(&self, plan: &[RowPlan]) -> Vec<usize> {
         let mut widths = vec![0usize; self.columns.len()];
         for (index, column) in self.columns.iter().enumerate() {
             if self.header {
                 widths[index] = column.header.width();
             }
         }
-        for row in &self.rows {
-            self.accumulate_row_widths(row, &mut widths);
+        for row in plan {
+            for placed in &row.cells {
+                if let Some(cell) = placed.cell
+                    && placed.colspan == 1
+                {
+                    widths[placed.start] =
+                        widths[placed.start].max(cell.content.width());
+                }
+            }
         }
         for (index, column) in self.columns.iter().enumerate() {
             widths[index] = clamp_width(widths[index], column);
         }
         widths
     }
+}
 
-    /// Updates `widths` from the single-span cells of one row.
-    fn accumulate_row_widths(&self, row: &Row, widths: &mut [usize]) {
+/// A cell placed at a concrete column position (or a rowspan continuation).
+struct PlacedCell<'a> {
+    cell: Option<&'a Cell>,
+    start: usize,
+    colspan: usize,
+}
+
+/// One visual row: every column filled, including rowspan continuations.
+struct RowPlan<'a> {
+    cells: Vec<PlacedCell<'a>>,
+    footer: bool,
+}
+
+/// Resolves rows into a grid, honoring colspan and rowspan occupancy.
+fn build_plan(rows: &[Row], cols: usize) -> Vec<RowPlan<'_>> {
+    let mut occupied = vec![0usize; cols];
+    let mut plan = Vec::with_capacity(rows.len());
+    for row in rows {
+        let mut placed = Vec::new();
+        let mut cells = row.cells.iter();
         let mut col = 0;
-        for cell in &row.cells {
-            if col >= widths.len() {
-                break;
+        while col < cols {
+            if occupied[col] > 0 {
+                occupied[col] -= 1;
+                placed.push(PlacedCell {
+                    cell: None,
+                    start: col,
+                    colspan: 1,
+                });
+                col += 1;
+                continue;
             }
-            if cell.colspan == 1 {
-                widths[col] = widths[col].max(cell.content.width());
+            match cells.next() {
+                Some(cell) => {
+                    let span = cell.colspan.min(cols - col).max(1);
+                    if cell.rowspan > 1 {
+                        for slot in occupied.iter_mut().skip(col).take(span) {
+                            *slot = cell.rowspan - 1;
+                        }
+                    }
+                    placed.push(PlacedCell {
+                        cell: Some(cell),
+                        start: col,
+                        colspan: span,
+                    });
+                    col += span;
+                }
+                None => {
+                    placed.push(PlacedCell {
+                        cell: None,
+                        start: col,
+                        colspan: 1,
+                    });
+                    col += 1;
+                }
             }
-            col += cell.colspan;
         }
+        plan.push(RowPlan {
+            cells: placed,
+            footer: row.footer,
+        });
     }
+    plan
 }
 
 /// Clamps a natural width by a column's min/max/fixed constraints.
@@ -323,18 +394,24 @@ fn clamp_width(natural: usize, column: &Column) -> usize {
     width.max(1)
 }
 
-/// Assembles the table lines from columns, rows and widths.
+/// Assembles the table lines from columns, the placement plan and widths.
 struct Builder<'a> {
     table: &'a Table,
     widths: &'a [usize],
+    plan: &'a [RowPlan<'a>],
     chars: BorderChars,
 }
 
 impl<'a> Builder<'a> {
-    fn new(table: &'a Table, widths: &'a [usize]) -> Self {
+    fn new(
+        table: &'a Table,
+        widths: &'a [usize],
+        plan: &'a [RowPlan<'a>],
+    ) -> Self {
         Self {
             table,
             widths,
+            plan,
             chars: table.border.chars(),
         }
     }
@@ -376,18 +453,24 @@ impl<'a> Builder<'a> {
             .iter()
             .map(|column| Cell::new(column.header.clone()).align(column.align))
             .collect();
-        let row = Row {
-            cells,
-            footer: false,
-        };
-        self.push_row(lines, &row, self.table.header_style, false);
+        let placed: Vec<PlacedCell> = cells
+            .iter()
+            .enumerate()
+            .map(|(index, cell)| PlacedCell {
+                cell: Some(cell),
+                start: index,
+                colspan: 1,
+            })
+            .collect();
+        self.push_row(lines, &placed, self.table.header_style, false);
     }
 
-    /// Pushes all body and footer rows.
+    /// Pushes all body and footer rows from the placement plan.
     fn push_body(&self, lines: &mut Vec<Line>) {
+        let last_body = self.plan.iter().rposition(|r| !r.footer);
         let mut body_index = 0;
         let mut footer_started = false;
-        for row in &self.table.rows {
+        for (index, row) in self.plan.iter().enumerate() {
             if row.footer && !footer_started {
                 self.push_border(lines, Edge::Middle);
                 footer_started = true;
@@ -398,48 +481,48 @@ impl<'a> Builder<'a> {
             } else {
                 Style::new()
             };
-            self.push_row(lines, row, style, striped);
+            self.push_row(lines, &row.cells, style, striped);
             if !row.footer {
                 body_index += 1;
-                if self.table.row_separators && !self.is_last_body(row) {
+                if self.table.row_separators && Some(index) != last_body {
                     self.push_border(lines, Edge::Middle);
                 }
             }
         }
     }
 
-    /// Returns whether `row` is the final body row.
-    fn is_last_body(&self, row: &Row) -> bool {
-        let last = self.table.rows.iter().rfind(|r| !r.footer);
-        last.is_some_and(|candidate| std::ptr::eq(candidate, row))
-    }
-
-    /// Renders one row (possibly multiple physical lines) into `lines`.
+    /// Renders one placed row (possibly multiple physical lines).
     fn push_row(
         &self,
         lines: &mut Vec<Line>,
-        row: &Row,
+        placed: &[PlacedCell],
         style: Style,
         fill_bg: bool,
     ) {
-        let cell_lines = self.cell_lines(row, style);
-        let height = cell_lines.iter().map(Vec::len).max().unwrap_or(1);
+        let cell_lines = self.cell_lines(placed, style);
+        let height = cell_lines.iter().map(Vec::len).max().unwrap_or(1).max(1);
         for physical in 0..height {
-            lines.push(self.row_line(row, &cell_lines, physical, fill_bg));
+            lines.push(self.row_line(placed, &cell_lines, physical, fill_bg));
         }
     }
 
-    /// Wraps/truncates each cell into its display lines.
-    fn cell_lines(&self, row: &Row, style: Style) -> Vec<Vec<Line>> {
-        let mut out = Vec::new();
-        let mut col = 0;
-        for cell in &row.cells {
-            let span_width = self.span_width(col, cell.colspan);
-            let wrap = self.column_wraps(col);
-            out.push(format_cell(cell, span_width, style, wrap));
-            col += cell.colspan;
-        }
-        out
+    /// Wraps/truncates each placed cell into its display lines.
+    fn cell_lines(
+        &self,
+        placed: &[PlacedCell],
+        style: Style,
+    ) -> Vec<Vec<Line>> {
+        placed
+            .iter()
+            .map(|slot| match slot.cell {
+                None => vec![Line::default()],
+                Some(cell) => {
+                    let width = self.span_width(slot.start, slot.colspan);
+                    let wrap = self.column_wraps(slot.start);
+                    format_cell(cell, width, style, wrap)
+                }
+            })
+            .collect()
     }
 
     /// Returns whether the column at `index` wraps its content.
@@ -447,21 +530,23 @@ impl<'a> Builder<'a> {
         self.table.columns.get(index).is_some_and(|c| c.wrap)
     }
 
-    /// Builds one physical line of a row.
+    /// Builds one physical line of a placed row.
     fn row_line(
         &self,
-        row: &Row,
+        placed: &[PlacedCell],
         cell_lines: &[Vec<Line>],
         physical: usize,
         fill_bg: bool,
     ) -> Line {
         let pad = self.table.pad as usize;
         let mut spans = vec![self.vbar()];
-        let mut col = 0;
-        for (cell_index, cell) in row.cells.iter().enumerate() {
-            let width = self.span_width(col, cell.colspan);
-            let align = cell.align.unwrap_or(self.align_for(col));
-            let content = blank_or(cell_lines, cell_index, physical);
+        for (slot_index, slot) in placed.iter().enumerate() {
+            let width = self.span_width(slot.start, slot.colspan);
+            let align = slot
+                .cell
+                .and_then(|c| c.align)
+                .unwrap_or(self.align_for(slot.start));
+            let content = blank_or(cell_lines, slot_index, physical);
             let fill = if fill_bg {
                 self.table.stripe_style
             } else {
@@ -469,7 +554,6 @@ impl<'a> Builder<'a> {
             };
             push_cell(&mut spans, content, width, pad, align, fill);
             spans.push(self.vbar());
-            col += cell.colspan;
         }
         Line::new(spans)
     }
@@ -669,6 +753,22 @@ mod tests {
             .border(BorderType::Single);
         let lines = plain(&table.render(80));
         assert!(lines.iter().any(|l| l.contains('…')));
+    }
+
+    #[test]
+    fn rowspan_spans_following_rows() {
+        let table = Table::new()
+            .header(false)
+            .columns(["A", "B"])
+            .row([Cell::new("x").rowspan(2), Cell::new("1")])
+            .row(["2"])
+            .border(BorderType::Single);
+        let lines = plain(&table.render(80));
+        // Top span row carries both the spanning cell and the first value.
+        assert!(lines.iter().any(|l| l.contains('x') && l.contains('1')));
+        // The continuation row shows the next value but not the spanned cell.
+        let two = lines.iter().find(|l| l.contains('2')).unwrap();
+        assert!(!two.contains('x'));
     }
 
     #[test]

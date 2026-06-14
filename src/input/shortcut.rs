@@ -56,6 +56,26 @@ pub fn hint_line(shortcuts: &[Shortcut]) -> Line {
     Line::new(spans)
 }
 
+/// Builds help-overlay lines listing each shortcut (key and label).
+pub fn help_overlay(shortcuts: &[Shortcut]) -> Vec<Line> {
+    let theme = theme();
+    let mut lines = vec![Line::styled("Keys".to_string(), theme.heading)];
+    for shortcut in shortcuts {
+        lines.push(Line::new(vec![
+            Span::styled(
+                format!("  {}", key_name(shortcut.key)),
+                Style::new().fg(theme.accent),
+            ),
+            Span::styled(format!("  {}", shortcut.label), theme.secondary),
+        ]));
+    }
+    lines.push(Line::styled(
+        "press any key to close".to_string(),
+        theme.secondary,
+    ));
+    lines
+}
+
 /// Returns a human-readable name for a key press.
 pub fn key_name(key: KeyPress) -> String {
     let mut name = String::new();

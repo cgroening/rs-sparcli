@@ -289,6 +289,7 @@ impl Cell {
     pub fn new(content: impl Into<Text>) -> Self;
     pub fn align(self, align: Align) -> Self;
     pub fn colspan(self, columns: usize) -> Self;
+    pub fn rowspan(self, rows: usize) -> Self;
 }
 
 pub struct Table { /* … */ }
@@ -307,7 +308,8 @@ impl Table {
 }
 ```
 
-> Note: horizontal spanning (`colspan`) is supported; `rowspan` is not.
+> Note: `colspan` and `rowspan` are supported. Pair `rowspan` with the default
+> (no row separators) for the cleanest result.
 
 ### Panel
 
@@ -536,11 +538,12 @@ pub fn vstack(parts: &[Rendered], gap: u16) -> Rendered;
 ### Outcome\<T\>
 
 ```rust
-pub enum Outcome<T> { Submitted(T), Cancelled }
+pub enum Outcome<T> { Submitted(T), Cancelled, Shortcut(i32) }
 
 impl<T> Outcome<T> {
     pub fn submitted(self) -> Option<T>;
     pub fn is_cancelled(&self) -> bool;
+    pub fn shortcut_id(&self) -> Option<i32>; // Some when ended on a shortcut
 }
 ```
 
@@ -566,6 +569,8 @@ impl TextInput {
     pub fn validate(self, validator: Validator) -> Self;
     pub fn char_filter(self, filter: CharFilter) -> Self;
     pub fn suggestions<I, S>(self, suggestions: I) -> Self; // ghost completion
+    pub fn dropdown(self) -> Self;          // navigable list instead of ghost
+    pub fn fuzzy_suggestions(self) -> Self; // subsequence match (vs prefix)
     pub fn history<I, S>(self, entries: I) -> Self;         // Up/Down recall
     pub fn run(self) -> Result<Outcome<String>>;
 }
@@ -620,10 +625,14 @@ impl Select {
     pub fn multi(self) -> Self;
     pub fn max_visible(self, rows: usize) -> Self;
     pub fn no_cycle(self) -> Self;
+    pub fn shortcuts<I: IntoIterator<Item = Shortcut>>(self, s: I) -> Self;
     pub fn run(self) -> Result<Outcome<usize>>;
     pub fn run_multi(self) -> Result<Outcome<Vec<usize>>>;
 }
 ```
+
+`shortcuts` adds a footer hint and a `?` help overlay; a bound key ends the
+prompt with `Outcome::Shortcut(id)`.
 
 ### FuzzySelect — feature `fuzzy` → `Outcome<usize>` / `Outcome<Vec<usize>>`
 
@@ -633,6 +642,7 @@ impl FuzzySelect {
     pub fn options<I, S>(self, options: I) -> Self;
     pub fn multi(self) -> Self;
     pub fn max_visible(self, rows: usize) -> Self;
+    pub fn shortcuts<I: IntoIterator<Item = Shortcut>>(self, s: I) -> Self;
     pub fn run(self) -> Result<Outcome<usize>>;
     pub fn run_multi(self) -> Result<Outcome<Vec<usize>>>;
 }
@@ -645,6 +655,8 @@ pub struct Date { pub year: i32, pub month: u32, pub day: u32 }
 
 impl Date {
     pub fn new(year: i32, month: u32, day: u32) -> Self;
+    pub fn empty() -> Self;          // "no date" sentinel
+    pub fn is_empty(self) -> bool;
     pub fn today() -> Self;
     pub fn days_in_month(self) -> u32;
     pub fn weekday_monday0(self) -> u32; // 0 = Monday
@@ -655,6 +667,7 @@ impl Date {
 impl DatePicker {
     pub fn new(prompt: impl Into<String>) -> Self;
     pub fn initial(self, date: Date) -> Self;
+    pub fn allow_clear(self) -> Self; // Del/Backspace -> Date::empty()
     pub fn run(self) -> Result<Outcome<Date>>;
 }
 ```
@@ -699,8 +712,12 @@ impl Shortcut { pub fn new(key: KeyPress, id: i32, label: impl Into<String>) -> 
 
 pub fn find(key: KeyPress, shortcuts: &[Shortcut]) -> Option<i32>;
 pub fn hint_line(shortcuts: &[Shortcut]) -> Line;   // footer hint
+pub fn help_overlay(shortcuts: &[Shortcut]) -> Vec<Line>; // `?` overlay lines
 pub fn key_name(key: KeyPress) -> String;           // e.g. "Ctrl-S"
 ```
+
+`Select` and `FuzzySelect` accept `.shortcuts(...)` directly; the standalone
+helpers above are for building your own prompt loops.
 
 ### Events (`input::event`)
 

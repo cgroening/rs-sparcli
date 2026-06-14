@@ -21,6 +21,7 @@ use crate::input::event::{
 use crate::input::guard::TerminalGuard;
 use crate::input::line_edit::LineEditor;
 use crate::input::prompt::{Flow, run_prompt};
+use crate::input::shortcut::{self, Shortcut};
 
 /// Default number of visible result rows.
 const DEFAULT_VISIBLE: usize = 10;
@@ -40,6 +41,7 @@ pub struct FuzzySelect {
     options: Vec<String>,
     max_visible: usize,
     multi: bool,
+    shortcuts: Vec<Shortcut>,
 }
 
 impl FuzzySelect {
@@ -50,7 +52,21 @@ impl FuzzySelect {
             options: Vec::new(),
             max_visible: DEFAULT_VISIBLE,
             multi: false,
+            shortcuts: Vec::new(),
         }
+    }
+
+    /// Registers shortcuts shown in a footer hint.
+    ///
+    /// Pressing a bound key ends the prompt with [`Outcome::Shortcut`]. Use
+    /// modified keys (e.g. Ctrl-…) so they do not collide with typing.
+    #[must_use]
+    pub fn shortcuts<I>(mut self, shortcuts: I) -> Self
+    where
+        I: IntoIterator<Item = Shortcut>,
+    {
+        self.shortcuts = shortcuts.into_iter().collect();
+        self
     }
 
     /// Adds options from any string iterator.
@@ -91,6 +107,7 @@ impl FuzzySelect {
                 .copied()
                 .map_or(Outcome::Cancelled, Outcome::Submitted),
             Outcome::Cancelled => Outcome::Cancelled,
+            Outcome::Shortcut(id) => Outcome::Shortcut(id),
         })
     }
 
@@ -144,6 +161,9 @@ impl FuzzySelect {
         for row in state.offset..end {
             lines.push(self.result_line(state, row, &theme));
         }
+        if !final_frame && !self.shortcuts.is_empty() {
+            lines.push(shortcut::hint_line(&self.shortcuts));
+        }
         Rendered::new(lines)
     }
 
@@ -189,6 +209,9 @@ impl FuzzySelect {
 
     /// Handles a single key press.
     fn handle_key(&self, state: &mut State, key: KeyPress) -> Flow<Vec<usize>> {
+        if let Some(id) = shortcut::find(key, &self.shortcuts) {
+            return Flow::Shortcut(id);
+        }
         match key.code {
             KeyCode::Esc => return Flow::Cancel,
             KeyCode::Enter => return self.submit(state),

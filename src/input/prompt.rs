@@ -18,6 +18,8 @@ pub(crate) enum Flow<T> {
     Submit(T),
     /// Finish as cancelled.
     Cancel,
+    /// Finish because a registered shortcut fired (carries its id).
+    Shortcut(i32),
 }
 
 /// Runs a prompt loop over `source`, driving `render` and `handle`.
@@ -53,6 +55,10 @@ where
             Flow::Cancel => {
                 inplace.finish()?;
                 return Ok(Outcome::Cancelled);
+            }
+            Flow::Shortcut(id) => {
+                inplace.finish()?;
+                return Ok(Outcome::Shortcut(id));
             }
         }
     }

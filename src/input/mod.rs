@@ -32,19 +32,29 @@ pub enum Outcome<T> {
     Submitted(T),
     /// The user cancelled (Esc or Ctrl-C).
     Cancelled,
+    /// The user pressed a registered shortcut; carries its id.
+    Shortcut(i32),
 }
 
 impl<T> Outcome<T> {
-    /// Returns the submitted value, or `None` if cancelled.
+    /// Returns the submitted value, or `None` otherwise.
     pub fn submitted(self) -> Option<T> {
         match self {
             Outcome::Submitted(value) => Some(value),
-            Outcome::Cancelled => None,
+            Outcome::Cancelled | Outcome::Shortcut(_) => None,
         }
     }
 
     /// Returns `true` if the prompt was cancelled.
     pub fn is_cancelled(&self) -> bool {
         matches!(self, Outcome::Cancelled)
+    }
+
+    /// Returns the fired shortcut id, if the prompt ended on a shortcut.
+    pub fn shortcut_id(&self) -> Option<i32> {
+        match self {
+            Outcome::Shortcut(id) => Some(*id),
+            _ => None,
+        }
     }
 }
