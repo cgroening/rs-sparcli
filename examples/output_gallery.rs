@@ -164,7 +164,7 @@ fn key_values_and_badges() -> Result<()> {
     section("Key-value & badges")?;
     KeyValue::new()
         .add("Version", "0.1.0")
-        .add("License", "MIT OR Apache-2.0")
+        .add("License", "MIT")
         .print()?;
     println!();
     Rendered::new(vec![Line::new(vec![

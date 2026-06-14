@@ -1,12 +1,15 @@
 [package]
 name = "sparcli"
-version = "0.0.1"
+version = "0.1.1"
 edition = "2024"
+rust-version = "1.88"
 description = "Lightweight, cross-platform toolkit for styled CLI output and interactive input widgets"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/cgroening/sparcli"
-keywords = ["cli", "terminal", "tui", "color", "prompt"]
+license = "MIT"
+repository = "https://github.com/cgroening/rs-sparcli"
+readme = "README.md"
+keywords = ["cli", "terminal", "prompt", "color", "ansi"]
 categories = ["command-line-interface"]
+exclude = ["/images"]
 
 [features]
 default = []
