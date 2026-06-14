@@ -15,6 +15,7 @@ use sparcli::{
 use sparcli::core::markup::parse;
 
 fn main() -> Result<()> {
+    println!();
     hero()?;
     println!();
     dashboard()?;

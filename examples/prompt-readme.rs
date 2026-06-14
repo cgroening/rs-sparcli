@@ -13,6 +13,7 @@ use sparcli::{
 };
 
 fn main() -> Result<()> {
+    println!();
     choices()?;
     println!();
     fields()?;
