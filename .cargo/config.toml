@@ -1,0 +1,3 @@
+# Keep build artifacts out of iCloud sync (Style Guide §7.2)
+[build]
+target-dir = "target.nosync"

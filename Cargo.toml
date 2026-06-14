@@ -1,0 +1,33 @@
+[package]
+name = "sparcli"
+version = "0.1.0"
+edition = "2024"
+description = "Lightweight, cross-platform toolkit for styled CLI output and interactive input widgets"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/cgroening/sparcli"
+keywords = ["cli", "terminal", "tui", "color", "prompt"]
+categories = ["command-line-interface"]
+
+[features]
+default = []
+# Rich-style inline markup parsing: "[bold red]text[/]"
+markup = []
+# Inline fuzzy-select prompt backed by nucleo-matcher
+fuzzy = ["dep:nucleo-matcher"]
+# Pager integration via $PAGER / less / more
+pager = []
+# Everything on
+full = ["markup", "fuzzy", "pager"]
+
+[dependencies]
+# https://crates.io/crates/crossterm
+crossterm = "0.29"
+# https://crates.io/crates/unicode-width
+unicode-width = "0.2"
+# https://crates.io/crates/thiserror
+thiserror = "2"
+# https://crates.io/crates/nucleo-matcher
+nucleo-matcher = { version = "0.3", optional = true }
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
