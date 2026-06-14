@@ -129,15 +129,12 @@ impl Tree {
         lines: &mut Vec<Line>,
     ) {
         for (row, content_line) in node.content.lines.iter().enumerate() {
-            let mut spans = vec![Span::raw(prefix.to_string())];
-            if row == 0 {
-                spans.push(Span::styled(
-                    connector.to_string(),
-                    self.connector_style,
-                ));
-            } else {
-                spans.push(Span::raw(continuation.to_string()));
-            }
+            // Style the ancestor-guide prefix like the connectors so the
+            // vertical guides match the branches in color.
+            let mut spans =
+                vec![Span::styled(prefix.to_string(), self.connector_style)];
+            let lead = if row == 0 { connector } else { continuation };
+            spans.push(Span::styled(lead.to_string(), self.connector_style));
             spans.extend(content_line.spans.iter().cloned());
             lines.push(Line::new(spans));
         }
