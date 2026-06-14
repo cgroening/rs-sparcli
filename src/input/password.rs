@@ -22,6 +22,7 @@ struct State {
 /// A masked password input prompt.
 pub struct PasswordInput {
     prompt: String,
+    initial: String,
     mask: String,
     max_chars: usize,
     validator: Option<Validator>,
@@ -33,11 +34,19 @@ impl PasswordInput {
     pub fn new(prompt: impl Into<String>) -> Self {
         Self {
             prompt: prompt.into(),
+            initial: String::new(),
             mask: "*".to_string(),
             max_chars: 0,
             validator: None,
             char_filter: None,
         }
+    }
+
+    /// Sets an initial value (mainly useful for previews/screenshots).
+    #[must_use]
+    pub fn initial(mut self, value: impl Into<String>) -> Self {
+        self.initial = value.into();
+        self
     }
 
     /// Sets the mask glyph. An empty mask hides the length entirely.
@@ -88,7 +97,7 @@ impl PasswordInput {
         source: &mut impl EventSource,
     ) -> Result<Outcome<String>> {
         let mut state = State {
-            editor: LineEditor::new("", false),
+            editor: LineEditor::new(&self.initial, false),
             error: None,
         };
         run_prompt(
@@ -97,6 +106,16 @@ impl PasswordInput {
             |state, final_frame| self.render(state, final_frame),
             |state, event| self.handle(state, event),
         )
+    }
+
+    /// Renders the prompt's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        let state = State {
+            editor: LineEditor::new(&self.initial, false),
+            error: None,
+        };
+        self.render(&state, false)
     }
 
     /// Builds the prompt frame with the masked value.

@@ -107,6 +107,16 @@ impl NumberInput {
         )
     }
 
+    /// Renders the prompt's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        let state = State {
+            editor: LineEditor::new(&self.format(self.initial), false),
+            error: None,
+        };
+        self.render(&state, false)
+    }
+
     /// Builds the prompt frame.
     fn render(&self, state: &State, final_frame: bool) -> Rendered {
         let theme = theme();

@@ -83,6 +83,13 @@ impl Textarea {
         )
     }
 
+    /// Renders the prompt's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        let editor = LineEditor::new(&self.initial, true);
+        self.render(&editor, false)
+    }
+
     /// Builds the prompt frame, drawing the cursor on its line.
     ///
     /// The final frame omits the cursor.

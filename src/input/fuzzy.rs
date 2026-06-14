@@ -42,6 +42,7 @@ pub struct FuzzySelect {
     max_visible: usize,
     multi: bool,
     shortcuts: Vec<Shortcut>,
+    initial_query: String,
 }
 
 impl FuzzySelect {
@@ -53,7 +54,15 @@ impl FuzzySelect {
             max_visible: DEFAULT_VISIBLE,
             multi: false,
             shortcuts: Vec::new(),
+            initial_query: String::new(),
         }
+    }
+
+    /// Pre-fills the search query.
+    #[must_use]
+    pub fn query(mut self, query: impl Into<String>) -> Self {
+        self.initial_query = query.into();
+        self
     }
 
     /// Registers shortcuts shown in a footer hint.
@@ -135,19 +144,30 @@ impl FuzzySelect {
         &self,
         source: &mut impl EventSource,
     ) -> Result<Outcome<Vec<usize>>> {
-        let mut state = State {
-            query: LineEditor::new("", false),
-            filtered: (0..self.options.len()).collect(),
-            cursor: 0,
-            offset: 0,
-            checked: vec![false; self.options.len()],
-        };
+        let mut state = self.initial_state();
         run_prompt(
             source,
             &mut state,
             |state, final_frame| self.render(state, final_frame),
             |state, event| self.handle(state, event),
         )
+    }
+
+    /// Builds the starting state, applying the initial query.
+    fn initial_state(&self) -> State {
+        State {
+            query: LineEditor::new(&self.initial_query, false),
+            filtered: self.filter(&self.initial_query),
+            cursor: 0,
+            offset: 0,
+            checked: vec![false; self.options.len()],
+        }
+    }
+
+    /// Renders the prompt's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        self.render(&self.initial_state(), false)
     }
 
     /// Builds the prompt frame: query field plus filtered results.

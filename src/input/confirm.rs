@@ -98,6 +98,16 @@ impl Confirm {
         )
     }
 
+    /// Renders the prompt's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        let state = State {
+            yes: self.default_yes,
+            help: false,
+        };
+        self.render(&state)
+    }
+
     /// Builds the prompt frame for the given selection.
     fn render(&self, state: &State) -> Rendered {
         let theme = theme();

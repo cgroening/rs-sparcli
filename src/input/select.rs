@@ -33,6 +33,8 @@ pub struct Select {
     max_visible: usize,
     cycle: bool,
     shortcuts: Vec<Shortcut>,
+    initial_cursor: usize,
+    initial_checked: Vec<usize>,
 }
 
 impl Select {
@@ -45,7 +47,26 @@ impl Select {
             max_visible: DEFAULT_VISIBLE,
             cycle: true,
             shortcuts: Vec::new(),
+            initial_cursor: 0,
+            initial_checked: Vec::new(),
         }
+    }
+
+    /// Sets the initially highlighted row.
+    #[must_use]
+    pub fn cursor(mut self, index: usize) -> Self {
+        self.initial_cursor = index;
+        self
+    }
+
+    /// Sets the initially checked rows (multi-select).
+    #[must_use]
+    pub fn checked<I>(mut self, indices: I) -> Self
+    where
+        I: IntoIterator<Item = usize>,
+    {
+        self.initial_checked = indices.into_iter().collect();
+        self
     }
 
     /// Registers shortcuts shown in a footer hint and the `?` help overlay.
@@ -136,18 +157,38 @@ impl Select {
         if self.options.is_empty() {
             return Ok(Outcome::Submitted(Vec::new()));
         }
-        let mut state = State {
-            cursor: 0,
-            checked: vec![false; self.options.len()],
-            offset: 0,
-            help: false,
-        };
+        let mut state = self.initial_state();
         run_prompt(
             source,
             &mut state,
             |state, _| self.render(state),
             |state, event| self.handle(state, event),
         )
+    }
+
+    /// Builds the starting state, honoring the initial cursor and checks.
+    fn initial_state(&self) -> State {
+        let len = self.options.len();
+        let cursor = self.initial_cursor.min(len.saturating_sub(1));
+        let mut checked = vec![false; len];
+        for &index in &self.initial_checked {
+            if index < len {
+                checked[index] = true;
+            }
+        }
+        let offset = cursor.saturating_sub(self.max_visible.saturating_sub(1));
+        State {
+            cursor,
+            checked,
+            offset,
+            help: false,
+        }
+    }
+
+    /// Renders the prompt's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        self.render(&self.initial_state())
     }
 
     /// Builds the prompt frame with the visible window of options.

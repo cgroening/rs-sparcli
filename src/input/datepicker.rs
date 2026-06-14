@@ -213,6 +213,16 @@ impl DatePicker {
         )
     }
 
+    /// Renders the picker's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        let state = State {
+            date: self.initial,
+            help: false,
+        };
+        self.render(&state)
+    }
+
     /// Builds the calendar frame for the selected date.
     fn render(&self, state: &State) -> Rendered {
         let theme = theme();

@@ -233,6 +233,20 @@ impl TextInput {
         (Some(store), entries)
     }
 
+    /// Renders the prompt's static frame without running it (for previews
+    /// and README screenshots).
+    pub fn frame(&self) -> Rendered {
+        let state = State {
+            editor: LineEditor::new(&self.initial, false),
+            error: None,
+            history_index: None,
+            dropdown_index: None,
+            history_entries: self.history.clone(),
+            store: None,
+        };
+        self.render(&state, false)
+    }
+
     /// Builds the prompt frame.
     fn render(&self, state: &State, final_frame: bool) -> Rendered {
         let theme = theme();
