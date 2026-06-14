@@ -41,7 +41,11 @@ where
     R: FnMut(&S, bool) -> Rendered,
     H: FnMut(&mut S, InputEvent) -> Flow<T>,
 {
-    let mut inplace = InPlace::new(false);
+    let mut inplace = if source.is_interactive() {
+        InPlace::new(false)
+    } else {
+        InPlace::silent()
+    };
     loop {
         let frame = render(state, false);
         inplace.draw(&frame)?;

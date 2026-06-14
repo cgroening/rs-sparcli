@@ -188,11 +188,20 @@ impl Textarea {
     }
 
     /// Opens the buffer in an external editor, then refreshes the prompt.
+    ///
+    /// Raw mode is only toggled when it was already enabled, so headless
+    /// callers never alter the terminal.
     fn launch_editor(&self, editor: &mut LineEditor) -> Flow<String> {
-        let _ = crossterm::terminal::disable_raw_mode();
+        let was_raw =
+            crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
+        if was_raw {
+            let _ = crossterm::terminal::disable_raw_mode();
+        }
         let command = self.editor_command.as_deref();
         let result = edit_text(command, &editor.value(), ".md");
-        let _ = crossterm::terminal::enable_raw_mode();
+        if was_raw {
+            let _ = crossterm::terminal::enable_raw_mode();
+        }
         if let Ok(text) = result {
             editor.set_value(text.trim_end_matches('\n'));
         }

@@ -103,9 +103,10 @@ mod tests {
     }
 
     #[test]
-    fn update_is_ok_without_terminal() {
+    fn add_returns_sequential_indices() {
+        // Avoids `update`, which would draw to the real terminal under a TTY.
         let mut multi = MultiProgress::new();
-        let index = multi.add(ProgressBar::new());
-        assert!(multi.update(index, 1.0, 2.0).is_ok());
+        assert_eq!(multi.add(ProgressBar::new()), 0);
+        assert_eq!(multi.add(ProgressBar::new()), 1);
     }
 }

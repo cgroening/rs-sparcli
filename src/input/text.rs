@@ -451,11 +451,20 @@ impl TextInput {
     }
 
     /// Opens the value in an external editor, then refreshes the prompt.
+    ///
+    /// Raw mode is only toggled when it was already enabled (i.e. a real
+    /// interactive run), so headless callers never alter the terminal.
     fn launch_editor(&self, state: &mut State) -> Flow<String> {
-        let _ = crossterm::terminal::disable_raw_mode();
+        let was_raw =
+            crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
+        if was_raw {
+            let _ = crossterm::terminal::disable_raw_mode();
+        }
         let command = self.editor_command.as_deref();
         let result = editor::edit_text(command, &state.editor.value(), ".txt");
-        let _ = crossterm::terminal::enable_raw_mode();
+        if was_raw {
+            let _ = crossterm::terminal::enable_raw_mode();
+        }
         if let Ok(text) = result {
             let single_line = text.replace('\n', " ");
             state.editor.set_value(single_line.trim_end());

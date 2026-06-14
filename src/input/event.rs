@@ -106,6 +106,14 @@ pub trait EventSource {
     /// # Errors
     /// Returns an error if the underlying terminal read fails.
     fn next_event(&mut self) -> Result<InputEvent>;
+
+    /// Whether this source drives a real, interactive terminal.
+    ///
+    /// Non-interactive sources (e.g. scripted tests) must not draw to the
+    /// terminal, so the prompt loop skips all rendering for them.
+    fn is_interactive(&self) -> bool {
+        true
+    }
 }
 
 /// The real event source, backed by crossterm.
@@ -194,6 +202,10 @@ impl EventSource for ScriptedSource {
             .events
             .pop_front()
             .unwrap_or(InputEvent::Key(KeyPress::new(KeyCode::Esc))))
+    }
+
+    fn is_interactive(&self) -> bool {
+        false
     }
 }
 

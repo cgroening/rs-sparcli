@@ -19,6 +19,7 @@ use crate::error::Result;
 /// Shared in-place frame writer used by live displays and progress widgets.
 pub(crate) struct InPlace {
     interactive: bool,
+    silent: bool,
     last_height: u16,
     last_frame: Rendered,
 }
@@ -28,6 +29,17 @@ impl InPlace {
     pub(crate) fn new(always: bool) -> Self {
         Self {
             interactive: always || is_output_tty(),
+            silent: false,
+            last_height: 0,
+            last_frame: Rendered::empty(),
+        }
+    }
+
+    /// Creates a writer that never touches the terminal (headless prompts).
+    pub(crate) fn silent() -> Self {
+        Self {
+            interactive: false,
+            silent: true,
             last_height: 0,
             last_frame: Rendered::empty(),
         }
@@ -35,6 +47,9 @@ impl InPlace {
 
     /// Draws a frame in place, replacing the previous one.
     pub(crate) fn draw(&mut self, frame: &Rendered) -> Result<()> {
+        if self.silent {
+            return Ok(());
+        }
         if !self.interactive {
             self.last_frame = frame.clone();
             return Ok(());
@@ -68,6 +83,9 @@ impl InPlace {
 
     /// Finishes the session, leaving the final frame on screen.
     pub(crate) fn finish(self) -> Result<()> {
+        if self.silent {
+            return Ok(());
+        }
         let mut out = io::stdout().lock();
         if self.interactive {
             queue!(out, Print("\r\n"))?;
@@ -81,7 +99,7 @@ impl InPlace {
 
     /// Finishes the session, erasing the last frame (transient display).
     pub(crate) fn clear(mut self) -> Result<()> {
-        if self.interactive {
+        if !self.silent && self.interactive {
             let mut out = io::stdout().lock();
             self.rewind(&mut out)?;
             self.last_height = 0;
@@ -157,13 +175,20 @@ impl Live {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::text::Line;
 
     #[test]
-    fn update_is_ok_without_terminal() {
-        // Tests run without a TTY, so the writer is non-interactive.
-        let mut live = Live::new();
-        let frame = Rendered::new(vec![Line::raw("x")]);
-        assert!(live.update(&frame).is_ok());
+    fn constructs_without_drawing() {
+        // `update`/`finish` write directly to stdout (bypassing libtest
+        // capture), so the test only exercises construction.
+        let _live = Live::new();
+        let _always = Live::always();
+    }
+
+    #[test]
+    fn silent_writer_never_draws() {
+        let mut inplace = InPlace::silent();
+        let frame = Rendered::new(vec![crate::core::text::Line::raw("x")]);
+        assert!(inplace.draw(&frame).is_ok());
+        assert!(inplace.finish().is_ok());
     }
 }
