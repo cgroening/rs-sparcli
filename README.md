@@ -101,7 +101,8 @@ The same theme drives both output widgets and input prompts.
 
 ```sh
 cargo run --example output_gallery --features markup,fuzzy,pager
-cargo run --example prompts   # interactive; needs a real terminal
+cargo run --example output_dynamic --features pager  # spinner/progress/live
+cargo run --example prompts --features fuzzy          # interactive; needs a TTY
 ```
 
 ## License

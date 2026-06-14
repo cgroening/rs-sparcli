@@ -140,9 +140,11 @@ fn write_span<W: Write>(
     span: &Span,
     support: ColorSupport,
 ) -> io::Result<()> {
-    // No-color terminals (and NO_COLOR / pipes) get plain text only.
+    // No-color terminals (and NO_COLOR / pipes) get plain text only, without
+    // even OSC-8 hyperlink escapes.
     if support == ColorSupport::None {
-        return write_content(writer, span);
+        queue!(writer, Print(&span.content))?;
+        return Ok(());
     }
     let colored = apply_colors(writer, span, support)?;
     let attributed = apply_attributes(writer, span.style.attrs)?;
@@ -241,10 +243,18 @@ mod tests {
     }
 
     #[test]
-    fn hyperlink_span_emits_osc8() {
+    fn hyperlink_span_emits_osc8_when_colored() {
+        let line = Line::new(vec![Span::raw("x").link("http://e.com")]);
+        let rendered = Rendered::new(vec![line]);
+        let output = render_to_string(&rendered, ColorSupport::TrueColor);
+        assert!(output.contains("\x1b]8;;http://e.com"));
+    }
+
+    #[test]
+    fn hyperlink_is_plain_without_color() {
         let line = Line::new(vec![Span::raw("x").link("http://e.com")]);
         let rendered = Rendered::new(vec![line]);
         let output = render_to_string(&rendered, ColorSupport::None);
-        assert!(output.contains("\x1b]8;;http://e.com"));
+        assert_eq!(output, "x\n");
     }
 }
