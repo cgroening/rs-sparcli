@@ -155,7 +155,7 @@ impl DatePicker {
     /// Runs the picker against any event source (used for tests).
     fn run_with(&self, source: &mut impl EventSource) -> Result<Outcome<Date>> {
         let mut current = self.initial;
-        run_prompt(source, &mut current, |date| self.render(*date), handle)
+        run_prompt(source, &mut current, |date, _| self.render(*date), handle)
     }
 
     /// Builds the calendar frame for the selected date.

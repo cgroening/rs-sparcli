@@ -23,6 +23,23 @@ pub(crate) fn field_line(
     Line::new(spans)
 }
 
+/// Renders a labelled value without any cursor (used for the final frame).
+pub(crate) fn value_line(
+    prompt: &str,
+    display: &str,
+    style: Style,
+    theme: &Theme,
+) -> Line {
+    let mut spans = Vec::new();
+    if !prompt.is_empty() {
+        spans.push(Span::styled(format!("{prompt} "), theme.title));
+    }
+    if !display.is_empty() {
+        spans.push(Span::styled(display.to_string(), style));
+    }
+    Line::new(spans)
+}
+
 /// Renders dim placeholder text with the cursor at the start.
 pub(crate) fn placeholder_line(
     prompt: &str,

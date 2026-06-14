@@ -9,7 +9,9 @@ use crate::core::theme::theme;
 use crate::error::{Result, SparcliError};
 use crate::input::Outcome;
 use crate::input::event::{CrosstermSource, EventSource, InputEvent, KeyPress};
-use crate::input::field::{error_line, field_line, placeholder_line};
+use crate::input::field::{
+    error_line, field_line, placeholder_line, value_line,
+};
 use crate::input::guard::TerminalGuard;
 use crate::input::line_edit::LineEditor;
 use crate::input::prompt::{Flow, run_prompt};
@@ -133,15 +135,19 @@ impl TextInput {
         run_prompt(
             source,
             &mut state,
-            |state| self.render(state),
+            |state, final_frame| self.render(state, final_frame),
             |state, event| self.handle(state, event),
         )
     }
 
     /// Builds the prompt frame.
-    fn render(&self, state: &State) -> Rendered {
+    fn render(&self, state: &State, final_frame: bool) -> Rendered {
         let theme = theme();
         let value = state.editor.value();
+        if final_frame {
+            let line = value_line(&self.prompt, &value, Style::new(), &theme);
+            return Rendered::new(vec![line]);
+        }
         let mut lines = Vec::new();
         if value.is_empty() && !self.placeholder.is_empty() {
             lines.push(placeholder_line(
@@ -371,6 +377,22 @@ mod tests {
             vec![KeyCode::Char('h'), KeyCode::Tab, KeyCode::Enter],
         );
         assert_eq!(outcome, Outcome::Submitted("hello".to_string()));
+    }
+
+    #[test]
+    fn final_frame_drops_the_cursor() {
+        let input = TextInput::new("Name");
+        let state = State {
+            editor: LineEditor::new("asd", false),
+            error: None,
+            history_index: None,
+        };
+        // Active frame draws a block cursor (trailing space past the value).
+        let active = input.render(&state, false).lines[0].plain();
+        assert!(active.ends_with(' '));
+        // Final frame is the bare value, no cursor.
+        let finished = input.render(&state, true).lines[0].plain();
+        assert_eq!(finished, "Name asd");
     }
 
     #[test]

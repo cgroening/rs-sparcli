@@ -66,7 +66,7 @@ impl Confirm {
     /// Runs the prompt against any event source (used for tests).
     fn run_with(&self, source: &mut impl EventSource) -> Result<Outcome<bool>> {
         let mut state = self.default_yes;
-        run_prompt(source, &mut state, |yes| self.render(*yes), handle)
+        run_prompt(source, &mut state, |yes, _| self.render(*yes), handle)
     }
 
     /// Builds the prompt frame for the given selection.

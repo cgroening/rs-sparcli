@@ -127,7 +127,7 @@ impl Select {
         run_prompt(
             source,
             &mut state,
-            |state| self.render(state),
+            |state, _| self.render(state),
             |state, event| self.handle(state, event),
         )
     }

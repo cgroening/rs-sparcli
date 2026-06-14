@@ -128,15 +128,18 @@ impl FuzzySelect {
         run_prompt(
             source,
             &mut state,
-            |state| self.render(state),
+            |state, final_frame| self.render(state, final_frame),
             |state, event| self.handle(state, event),
         )
     }
 
     /// Builds the prompt frame: query field plus filtered results.
-    fn render(&self, state: &State) -> Rendered {
+    ///
+    /// The final frame omits the query cursor.
+    fn render(&self, state: &State, final_frame: bool) -> Rendered {
         let theme = theme();
-        let mut lines = vec![query_line(&self.prompt, state, &theme)];
+        let mut lines =
+            vec![query_line(&self.prompt, state, &theme, final_frame)];
         let end = (state.offset + self.max_visible).min(state.filtered.len());
         for row in state.offset..end {
             lines.push(self.result_line(state, row, &theme));
@@ -269,11 +272,18 @@ impl FuzzySelect {
     }
 }
 
-/// Builds the query input line.
-fn query_line(prompt: &str, state: &State, theme: &Theme) -> Line {
+/// Builds the query input line (the cursor is hidden on the final frame).
+fn query_line(
+    prompt: &str,
+    state: &State,
+    theme: &Theme,
+    final_frame: bool,
+) -> Line {
     let mut spans = vec![Span::styled(format!("{prompt} "), theme.title)];
     spans.push(Span::raw(state.query.value()));
-    spans.push(Span::styled(" ".to_string(), theme.cursor));
+    if !final_frame {
+        spans.push(Span::styled(" ".to_string(), theme.cursor));
+    }
     Line::new(spans)
 }
 

@@ -7,7 +7,7 @@ use crate::core::theme::theme;
 use crate::error::{Result, SparcliError};
 use crate::input::Outcome;
 use crate::input::event::{CrosstermSource, EventSource, InputEvent, KeyPress};
-use crate::input::field::{error_line, field_line};
+use crate::input::field::{error_line, field_line, value_line};
 use crate::input::guard::TerminalGuard;
 use crate::input::line_edit::LineEditor;
 use crate::input::prompt::{Flow, run_prompt};
@@ -102,17 +102,22 @@ impl NumberInput {
         run_prompt(
             source,
             &mut state,
-            |state| self.render(state),
+            |state, final_frame| self.render(state, final_frame),
             |state, event| self.handle(state, event),
         )
     }
 
     /// Builds the prompt frame.
-    fn render(&self, state: &State) -> Rendered {
+    fn render(&self, state: &State, final_frame: bool) -> Rendered {
         let theme = theme();
+        let value = state.editor.value();
+        if final_frame {
+            let line = value_line(&self.prompt, &value, Style::new(), &theme);
+            return Rendered::new(vec![line]);
+        }
         let mut lines = vec![field_line(
             &self.prompt,
-            &state.editor.value(),
+            &value,
             state.editor.cursor(),
             Style::new(),
             &theme,

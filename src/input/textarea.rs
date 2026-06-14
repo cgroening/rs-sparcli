@@ -55,16 +55,23 @@ impl Textarea {
         source: &mut impl EventSource,
     ) -> Result<Outcome<String>> {
         let mut editor = LineEditor::new(&self.initial, true);
-        run_prompt(source, &mut editor, |editor| self.render(editor), handle)
+        run_prompt(
+            source,
+            &mut editor,
+            |editor, final_frame| self.render(editor, final_frame),
+            handle,
+        )
     }
 
     /// Builds the prompt frame, drawing the cursor on its line.
-    fn render(&self, editor: &LineEditor) -> Rendered {
+    ///
+    /// The final frame omits the cursor.
+    fn render(&self, editor: &LineEditor, final_frame: bool) -> Rendered {
         let theme = theme();
         let (cursor_line, cursor_col) = editor.cursor_line_col();
         let mut lines = vec![Line::styled(self.prompt.clone(), theme.title)];
         for (index, text) in editor.lines().into_iter().enumerate() {
-            if index == cursor_line {
+            if index == cursor_line && !final_frame {
                 lines.push(field_line(
                     "",
                     &text,
