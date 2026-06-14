@@ -10,6 +10,10 @@ sparcli is meant for small, lightweight CLI tools: a single accent color, muted
 defaults, rounded borders, graceful `NO_COLOR` and non-terminal behavior. Heavy,
 full-screen/retained TUIs are out of scope (that is what ratatui is for).
 
+![sparcli output widgets](https://raw.githubusercontent.com/cgroening/rs-sparcli/main/images/screenshot-1.png)
+
+![sparcli input widgets](https://raw.githubusercontent.com/cgroening/rs-sparcli/main/images/screenshot-2.png)
+
 ## Highlights
 
 - **Output**: styled text, markup, tables (colspan, striping, wrap, titles),
