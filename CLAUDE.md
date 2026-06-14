@@ -57,7 +57,9 @@ CLI-Tools. Kein async, kein ratatui, minimaler Footprint.
 
 - Edition 2024. `cargo fmt` (rustfmt.toml: max_width 80).
 - `cargo clippy --all-targets -- -D warnings` muss sauber sein.
-- 80-Zeichen-Codezeilen; gerade Anführungszeichen; kein Geviertstrich.
+- 80-Zeichen-Codezeilen; gerade Anführungszeichen.
+- **Kein Geviertstrich (—).** Als Gedankenstrich: in Code-Dateien den
+  Bindestrich `-`, in `.md`-Dateien den Halbgeviertstrich `–` verwenden.
 - rustdoc auf jedem öffentlichen Item, Modul-`//!`; `# Examples`/`# Errors`/
   `# Panics` wo zutreffend; `#![warn(missing_docs)]`.
 
