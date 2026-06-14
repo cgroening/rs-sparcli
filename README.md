@@ -42,6 +42,19 @@ sparcli = "0.1"
 | `pager`  | paging via `$PAGER` / `less` / `more`             |
 | `full`   | enables `markup`, `fuzzy` and `pager`             |
 
+### From a local checkout or Git
+
+To use an unpublished or local copy instead of the crates.io release, point
+Cargo at the source directory or repository:
+
+```toml
+[dependencies]
+# Local path (absolute or relative to your Cargo.toml):
+sparcli = { path = "../sparcli" }
+# Straight from Git:
+# sparcli = { git = "https://github.com/cgroening/rs-sparcli", branch = "main" }
+```
+
 ## Output example
 
 ```rust
