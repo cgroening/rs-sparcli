@@ -11,6 +11,10 @@ keywords = ["cli", "terminal", "prompt", "color", "ansi"]
 categories = ["command-line-interface"]
 exclude = ["/images"]
 
+# Build docs.rs with every feature so markup/fuzzy/pager items are documented.
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = []
 # Rich-style inline markup parsing: "[bold red]text[/]"
