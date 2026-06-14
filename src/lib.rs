@@ -52,6 +52,7 @@ pub use output::pager::Pager;
 pub use input::Outcome;
 pub use input::confirm::Confirm;
 pub use input::datepicker::{Date, DatePicker};
+pub use input::editor::edit_file;
 pub use input::history::History;
 pub use input::number::NumberInput;
 pub use input::password::PasswordInput;

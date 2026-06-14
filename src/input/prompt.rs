@@ -20,6 +20,8 @@ pub(crate) enum Flow<T> {
     Cancel,
     /// Finish because a registered shortcut fired (carries its id).
     Shortcut(i32),
+    /// Keep open but redraw from scratch (after an external program ran).
+    Refresh,
 }
 
 /// Runs a prompt loop over `source`, driving `render` and `handle`.
@@ -46,6 +48,7 @@ where
         let event = source.next_event()?;
         match handle(state, event) {
             Flow::Continue => {}
+            Flow::Refresh => inplace.reset(),
             Flow::Submit(value) => {
                 let frame = render(state, true);
                 inplace.draw(&frame)?;

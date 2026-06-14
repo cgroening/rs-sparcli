@@ -59,6 +59,13 @@ impl InPlace {
         Ok(())
     }
 
+    /// Forgets the previous frame so the next draw starts fresh.
+    ///
+    /// Used after handing the terminal to an external program (e.g. an editor).
+    pub(crate) fn reset(&mut self) {
+        self.last_height = 0;
+    }
+
     /// Finishes the session, leaving the final frame on screen.
     pub(crate) fn finish(self) -> Result<()> {
         let mut out = io::stdout().lock();

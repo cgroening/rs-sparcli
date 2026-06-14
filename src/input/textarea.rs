@@ -7,6 +7,7 @@ use crate::core::text::Line;
 use crate::core::theme::theme;
 use crate::error::{Result, SparcliError};
 use crate::input::Outcome;
+use crate::input::editor::edit_text;
 use crate::input::event::{CrosstermSource, EventSource, InputEvent, KeyPress};
 use crate::input::field::field_line;
 use crate::input::guard::TerminalGuard;
@@ -17,6 +18,8 @@ use crate::input::prompt::{Flow, run_prompt};
 pub struct Textarea {
     prompt: String,
     initial: String,
+    editor_enabled: bool,
+    editor_command: Option<String>,
 }
 
 impl Textarea {
@@ -25,6 +28,8 @@ impl Textarea {
         Self {
             prompt: prompt.into(),
             initial: String::new(),
+            editor_enabled: false,
+            editor_command: None,
         }
     }
 
@@ -32,6 +37,21 @@ impl Textarea {
     #[must_use]
     pub fn initial(mut self, value: impl Into<String>) -> Self {
         self.initial = value.into();
+        self
+    }
+
+    /// Enables opening the buffer in `$EDITOR` with Ctrl-G.
+    #[must_use]
+    pub fn editor(mut self) -> Self {
+        self.editor_enabled = true;
+        self
+    }
+
+    /// Sets the editor command (implies [`editor`](Self::editor)).
+    #[must_use]
+    pub fn editor_command(mut self, command: impl Into<String>) -> Self {
+        self.editor_enabled = true;
+        self.editor_command = Some(command.into());
         self
     }
 
@@ -59,7 +79,7 @@ impl Textarea {
             source,
             &mut editor,
             |editor, final_frame| self.render(editor, final_frame),
-            handle,
+            |editor, event| self.handle(editor, event),
         )
     }
 
@@ -87,60 +107,90 @@ impl Textarea {
     }
 }
 
-/// Handles one event for the textarea.
-fn handle(editor: &mut LineEditor, event: InputEvent) -> Flow<String> {
-    match event {
-        InputEvent::Paste(text) => {
-            editor.insert_str(&text);
-            Flow::Continue
+impl Textarea {
+    /// Handles one event for the textarea.
+    fn handle(
+        &self,
+        editor: &mut LineEditor,
+        event: InputEvent,
+    ) -> Flow<String> {
+        match event {
+            InputEvent::Paste(text) => {
+                editor.insert_str(&text);
+                Flow::Continue
+            }
+            InputEvent::Key(key) => self.handle_key(editor, key),
+            InputEvent::Resize => Flow::Continue,
         }
-        InputEvent::Key(key) => handle_key(editor, key),
-        InputEvent::Resize => Flow::Continue,
     }
-}
 
-/// Handles a single key press.
-fn handle_key(editor: &mut LineEditor, key: KeyPress) -> Flow<String> {
-    use crate::input::event::KeyCode::{
-        Backspace, Char, Delete, Down, End, Enter, Esc, Home, Left, Right, Up,
-    };
-    if key.ctrl {
-        return handle_ctrl(editor, key);
-    }
-    match key.code {
-        Esc => return Flow::Cancel,
-        Enter => editor.insert_newline(),
-        Left => editor.move_left(key.shift),
-        Right => editor.move_right(key.shift),
-        Up => editor.move_up(key.shift),
-        Down => editor.move_down(key.shift),
-        Home => editor.move_home(key.shift),
-        End => editor.move_end(key.shift),
-        Backspace => editor.backspace(),
-        Delete => editor.delete(),
-        Char(c) => editor.insert_char(c),
-        _ => {}
-    }
-    Flow::Continue
-}
-
-/// Handles Ctrl-modified keys (Ctrl-D submits).
-fn handle_ctrl(editor: &mut LineEditor, key: KeyPress) -> Flow<String> {
-    use crate::input::event::KeyCode::Char;
-    if let Char(c) = key.code {
-        match c {
-            'd' => return Flow::Submit(editor.value()),
-            'a' => editor.select_all(),
-            'w' => editor.delete_word_back(),
-            'u' => editor.kill_to_line_start(),
-            'k' => editor.kill_to_line_end(),
-            'c' => editor.copy(),
-            'x' => editor.cut(),
-            'v' => editor.paste(),
+    /// Handles a single key press.
+    fn handle_key(
+        &self,
+        editor: &mut LineEditor,
+        key: KeyPress,
+    ) -> Flow<String> {
+        use crate::input::event::KeyCode::{
+            Backspace, Char, Delete, Down, End, Enter, Esc, Home, Left, Right,
+            Up,
+        };
+        if key.ctrl {
+            return self.handle_ctrl(editor, key);
+        }
+        match key.code {
+            Esc => return Flow::Cancel,
+            Enter => editor.insert_newline(),
+            Left => editor.move_left(key.shift),
+            Right => editor.move_right(key.shift),
+            Up => editor.move_up(key.shift),
+            Down => editor.move_down(key.shift),
+            Home => editor.move_home(key.shift),
+            End => editor.move_end(key.shift),
+            Backspace => editor.backspace(),
+            Delete => editor.delete(),
+            Char(c) => editor.insert_char(c),
             _ => {}
         }
+        Flow::Continue
     }
-    Flow::Continue
+
+    /// Handles Ctrl-modified keys (Ctrl-D submits, Ctrl-G opens the editor).
+    fn handle_ctrl(
+        &self,
+        editor: &mut LineEditor,
+        key: KeyPress,
+    ) -> Flow<String> {
+        use crate::input::event::KeyCode::Char;
+        if let Char(c) = key.code {
+            match c {
+                'd' => return Flow::Submit(editor.value()),
+                'g' if self.editor_enabled => {
+                    return self.launch_editor(editor);
+                }
+                'a' => editor.select_all(),
+                'w' => editor.delete_word_back(),
+                'u' => editor.kill_to_line_start(),
+                'k' => editor.kill_to_line_end(),
+                'c' => editor.copy(),
+                'x' => editor.cut(),
+                'v' => editor.paste(),
+                _ => {}
+            }
+        }
+        Flow::Continue
+    }
+
+    /// Opens the buffer in an external editor, then refreshes the prompt.
+    fn launch_editor(&self, editor: &mut LineEditor) -> Flow<String> {
+        let _ = crossterm::terminal::disable_raw_mode();
+        let command = self.editor_command.as_deref();
+        let result = edit_text(command, &editor.value(), ".md");
+        let _ = crossterm::terminal::enable_raw_mode();
+        if let Ok(text) = result {
+            editor.set_value(text.trim_end_matches('\n'));
+        }
+        Flow::Refresh
+    }
 }
 
 #[cfg(test)]

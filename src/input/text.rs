@@ -8,11 +8,13 @@ use crate::core::text::{Line, Span};
 use crate::core::theme::theme;
 use crate::error::{Result, SparcliError};
 use crate::input::Outcome;
+use crate::input::editor;
 use crate::input::event::{CrosstermSource, EventSource, InputEvent, KeyPress};
 use crate::input::field::{
     error_line, field_line, placeholder_line, value_line,
 };
 use crate::input::guard::TerminalGuard;
+use crate::input::history::History;
 use crate::input::line_edit::LineEditor;
 use crate::input::prompt::{Flow, run_prompt};
 use crate::input::validate::{CharFilter, Validator};
@@ -26,6 +28,8 @@ struct State {
     error: Option<String>,
     history_index: Option<usize>,
     dropdown_index: Option<usize>,
+    history_entries: Vec<String>,
+    store: Option<History>,
 }
 
 /// How suggestions are matched against the typed value.
@@ -41,12 +45,16 @@ pub struct TextInput {
     initial: String,
     placeholder: String,
     max_chars: usize,
+    hide_char_count: bool,
     validator: Option<Validator>,
     char_filter: Option<CharFilter>,
     suggestions: Vec<String>,
     history: Vec<String>,
+    history_app: Option<String>,
     dropdown: bool,
     match_mode: MatchMode,
+    editor_enabled: bool,
+    editor_command: Option<String>,
 }
 
 impl TextInput {
@@ -57,12 +65,16 @@ impl TextInput {
             initial: String::new(),
             placeholder: String::new(),
             max_chars: 0,
+            hide_char_count: false,
             validator: None,
             char_filter: None,
             suggestions: Vec::new(),
             history: Vec::new(),
+            history_app: None,
             dropdown: false,
             match_mode: MatchMode::Prefix,
+            editor_enabled: false,
+            editor_command: None,
         }
     }
 
@@ -142,6 +154,38 @@ impl TextInput {
         self
     }
 
+    /// Hides the `(n/max)` character counter shown when `max_chars` is set.
+    #[must_use]
+    pub fn hide_char_count(mut self) -> Self {
+        self.hide_char_count = true;
+        self
+    }
+
+    /// Persists history under the app's state dir, recalling and auto-adding.
+    ///
+    /// Loads previous entries for Up/Down recall and appends the submitted
+    /// value on success. Overrides [`history`](Self::history).
+    #[must_use]
+    pub fn history_app(mut self, app: impl Into<String>) -> Self {
+        self.history_app = Some(app.into());
+        self
+    }
+
+    /// Enables opening the value in `$EDITOR` with Ctrl-G.
+    #[must_use]
+    pub fn editor(mut self) -> Self {
+        self.editor_enabled = true;
+        self
+    }
+
+    /// Sets the editor command (implies [`editor`](Self::editor)).
+    #[must_use]
+    pub fn editor_command(mut self, command: impl Into<String>) -> Self {
+        self.editor_enabled = true;
+        self.editor_command = Some(command.into());
+        self
+    }
+
     /// Runs the prompt on the real terminal.
     ///
     /// # Errors
@@ -161,11 +205,14 @@ impl TextInput {
         &self,
         source: &mut impl EventSource,
     ) -> Result<Outcome<String>> {
+        let (store, history_entries) = self.load_history();
         let mut state = State {
             editor: LineEditor::new(&self.initial, false),
             error: None,
             history_index: None,
             dropdown_index: None,
+            history_entries,
+            store,
         };
         run_prompt(
             source,
@@ -173,6 +220,17 @@ impl TextInput {
             |state, final_frame| self.render(state, final_frame),
             |state, event| self.handle(state, event),
         )
+    }
+
+    /// Loads the persistent history store and the entries used for recall.
+    fn load_history(&self) -> (Option<History>, Vec<String>) {
+        let Some(app) = &self.history_app else {
+            return (None, self.history.clone());
+        };
+        let mut store = History::for_app(app);
+        let _ = store.load();
+        let entries = store.entries().to_vec();
+        (Some(store), entries)
     }
 
     /// Builds the prompt frame.
@@ -204,6 +262,13 @@ impl TextInput {
                 line.spans.push(Span::styled(ghost, theme.secondary));
             }
             lines.push(line);
+        }
+        if self.max_chars > 0
+            && !self.hide_char_count
+            && let Some(line) = lines.last_mut()
+        {
+            let count = format!(" ({}/{})", state.editor.len(), self.max_chars);
+            line.spans.push(Span::styled(count, theme.secondary));
         }
         if self.dropdown {
             self.push_dropdown(&mut lines, state, &value, &theme);
@@ -357,6 +422,7 @@ impl TextInput {
         use crate::input::event::KeyCode::Char;
         if let Char(c) = key.code {
             match c {
+                'g' if self.editor_enabled => return self.launch_editor(state),
                 'a' => state.editor.select_all(),
                 'w' => state.editor.delete_word_back(),
                 'u' => state.editor.kill_to_line_start(),
@@ -370,7 +436,21 @@ impl TextInput {
         Flow::Continue
     }
 
-    /// Validates and submits the current value.
+    /// Opens the value in an external editor, then refreshes the prompt.
+    fn launch_editor(&self, state: &mut State) -> Flow<String> {
+        let _ = crossterm::terminal::disable_raw_mode();
+        let command = self.editor_command.as_deref();
+        let result = editor::edit_text(command, &state.editor.value(), ".txt");
+        let _ = crossterm::terminal::enable_raw_mode();
+        if let Ok(text) = result {
+            let single_line = text.replace('\n', " ");
+            state.editor.set_value(single_line.trim_end());
+            state.dropdown_index = None;
+        }
+        Flow::Refresh
+    }
+
+    /// Validates and submits the current value, persisting history.
     fn submit(&self, state: &mut State) -> Flow<String> {
         let value = state.editor.value();
         if let Some(validator) = &self.validator
@@ -378,6 +458,10 @@ impl TextInput {
         {
             state.error = Some(message);
             return Flow::Continue;
+        }
+        if let Some(store) = &mut state.store {
+            store.add(&value);
+            let _ = store.save();
         }
         Flow::Submit(value)
     }
@@ -414,16 +498,16 @@ impl TextInput {
 
     /// Recalls the previous history entry.
     fn history_prev(&self, state: &mut State) {
-        if self.history.is_empty() {
+        if state.history_entries.is_empty() {
             return;
         }
         let index = match state.history_index {
-            None => self.history.len() - 1,
+            None => state.history_entries.len() - 1,
             Some(0) => 0,
             Some(i) => i - 1,
         };
         state.history_index = Some(index);
-        state.editor.set_value(&self.history[index]);
+        state.editor.set_value(&state.history_entries[index]);
     }
 
     /// Recalls the next history entry, clearing past the newest.
@@ -431,9 +515,9 @@ impl TextInput {
         let Some(index) = state.history_index else {
             return;
         };
-        if index + 1 < self.history.len() {
+        if index + 1 < state.history_entries.len() {
             state.history_index = Some(index + 1);
-            state.editor.set_value(&self.history[index + 1]);
+            state.editor.set_value(&state.history_entries[index + 1]);
         } else {
             state.history_index = None;
             state.editor.set_value("");
@@ -523,6 +607,22 @@ mod tests {
         assert_eq!(outcome, Outcome::Submitted("hello".to_string()));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn ctrl_g_round_trips_through_the_editor() {
+        use crate::input::event::{InputEvent, KeyPress};
+        // `true` does not modify the temp file, so the value is unchanged.
+        let outcome = TextInput::new("x")
+            .editor_command("true")
+            .initial("hi")
+            .run_with(&mut ScriptedSource::events([
+                InputEvent::Key(KeyPress::ctrl('g')),
+                InputEvent::Key(KeyPress::new(KeyCode::Enter)),
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted("hi".to_string()));
+    }
+
     #[test]
     fn final_frame_drops_the_cursor() {
         let input = TextInput::new("Name");
@@ -531,6 +631,8 @@ mod tests {
             error: None,
             history_index: None,
             dropdown_index: None,
+            history_entries: Vec::new(),
+            store: None,
         };
         // Active frame draws a block cursor (trailing space past the value).
         let active = input.render(&state, false).lines[0].plain();

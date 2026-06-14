@@ -554,6 +554,7 @@ impl Confirm {
     pub fn new(question: impl Into<String>) -> Self;
     pub fn default_yes(self) -> Self;
     pub fn labels(self, yes: impl Into<String>, no: impl Into<String>) -> Self;
+    pub fn shortcuts<I: IntoIterator<Item = Shortcut>>(self, s: I) -> Self;
     pub fn run(self) -> Result<Outcome<bool>>;
 }
 ```
@@ -571,7 +572,11 @@ impl TextInput {
     pub fn suggestions<I, S>(self, suggestions: I) -> Self; // ghost completion
     pub fn dropdown(self) -> Self;          // navigable list instead of ghost
     pub fn fuzzy_suggestions(self) -> Self; // subsequence match (vs prefix)
+    pub fn hide_char_count(self) -> Self;   // hides the (n/max) counter
     pub fn history<I, S>(self, entries: I) -> Self;         // Up/Down recall
+    pub fn history_app(self, app: impl Into<String>) -> Self; // persisted
+    pub fn editor(self) -> Self;            // Ctrl-G opens $EDITOR
+    pub fn editor_command(self, command: impl Into<String>) -> Self;
     pub fn run(self) -> Result<Outcome<String>>;
 }
 ```
@@ -612,6 +617,8 @@ pub fn eval(expr: &str) -> Result<f64, String>;
 impl Textarea {
     pub fn new(prompt: impl Into<String>) -> Self;
     pub fn initial(self, value: impl Into<String>) -> Self;
+    pub fn editor(self) -> Self;            // Ctrl-G opens $EDITOR
+    pub fn editor_command(self, command: impl Into<String>) -> Self;
     pub fn run(self) -> Result<Outcome<String>>; // Enter=newline, Ctrl-D=submit
 }
 ```
@@ -722,6 +729,16 @@ pub fn key_name(key: KeyPress) -> String;           // e.g. "Ctrl-S"
 
 `Select` and `FuzzySelect` accept `.shortcuts(...)` directly; the standalone
 helpers above are for building your own prompt loops.
+
+### External editor (`input::editor`)
+
+```rust
+// Open an external editor ($VISUAL / $EDITOR, or an override) on a file:
+pub fn edit_file(command: Option<&str>, path: &Path) -> Result<()>;
+```
+
+Text prompts call this internally for Ctrl-G; `edit_file` is exposed for
+standalone use.
 
 ### Events (`input::event`)
 

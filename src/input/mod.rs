@@ -7,6 +7,7 @@
 
 pub mod confirm;
 pub mod datepicker;
+pub mod editor;
 pub mod event;
 pub mod guard;
 pub mod history;
