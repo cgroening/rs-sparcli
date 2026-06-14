@@ -25,7 +25,7 @@ cargo build --all-features        # markup + fuzzy + pager
 cargo run --example output_gallery --features markup,fuzzy,pager
 
 # Time-based / interactive output (spinner, progress, multi-progress, live,
-# pager) — best in a real terminal
+# pager) – best in a real terminal
 cargo run --example output_dynamic --features pager
 
 # Interactive prompts (needs a real terminal / TTY)
@@ -104,9 +104,9 @@ the reverse. `sparcli` never depends on `ratatui`.
 
 ## Useful environment variables
 
-- `NO_COLOR=1` — disable all color output.
-- `CLICOLOR_FORCE=1` — force color even when output is not a terminal.
-- `SPARCLI_NO_TTY=1` — force "no terminal" behavior (used in tests).
+- `NO_COLOR=1` – disable all color output.
+- `CLICOLOR_FORCE=1` – force color even when output is not a terminal.
+- `SPARCLI_NO_TTY=1` – force "no terminal" behavior (used in tests).
 
 ## Adding a widget
 

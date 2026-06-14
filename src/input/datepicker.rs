@@ -232,7 +232,7 @@ impl DatePicker {
         let mut lines = vec![Line::styled(self.prompt.clone(), theme.title)];
         if state.date.is_empty() {
             lines.push(Line::styled(
-                "(no date) — press an arrow to choose".to_string(),
+                "(no date) - press an arrow to choose".to_string(),
                 theme.secondary,
             ));
         } else {

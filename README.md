@@ -114,11 +114,11 @@ cargo run --example prompt-readme                     # non-interactive prompts
 
 ## Documentation
 
-- [`API.md`](API.md) — the complete public API in one place.
-- [`DEVELOPMENT.md`](DEVELOPMENT.md) — building, testing and contributing.
-- [`CHANGELOG.md`](CHANGELOG.md) — release notes.
-- `cargo doc --all-features --open` — the canonical rustdoc reference.
+- [`API.md`](API.md) – the complete public API in one place.
+- [`DEVELOPMENT.md`](DEVELOPMENT.md) – building, testing and contributing.
+- [`CHANGELOG.md`](CHANGELOG.md) – release notes.
+- `cargo doc --all-features --open` – the canonical rustdoc reference.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT – see [`LICENSE`](LICENSE).

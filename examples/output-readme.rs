@@ -36,7 +36,7 @@ fn hero() -> Result<()> {
             Span::styled("styled terminal output", cyan),
             Span::raw(" and "),
             Span::styled("input", on_magenta),
-            Span::raw(" — panels, tables, trees, lists,"),
+            Span::raw(" - panels, tables, trees, lists,"),
         ]),
         Line::new(vec![
             Span::raw("key-value pairs, badges, rules, "),

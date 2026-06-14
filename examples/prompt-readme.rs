@@ -33,7 +33,7 @@ fn blank() -> Rendered {
 fn hero(width: u16) -> Result<()> {
     let theme = theme();
     let body = Text::new(vec![
-        Line::raw("Interactive prompts — confirm · select · text · password ·"),
+        Line::raw("Interactive prompts - confirm · select · text · password ·"),
         Line::raw("number · textarea · fuzzy · date."),
     ]);
     Panel::new(body)

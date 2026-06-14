@@ -9,9 +9,11 @@ The complete public API, grouped by layer. This mirrors the rustdoc
 - Every output widget implements [`Renderable`](#renderable): `.print()` writes
   to stdout, `.print_to(&mut w)` writes to any `Write`, `.render(width)` returns
   a [`Rendered`](#rendered) for composition.
-- Every prompt returns `Result<Outcome<T>>`, where
-  [`Outcome`](#outcomet) is `Submitted(T)` or `Cancelled`. Prompts need an
-  interactive terminal and otherwise return `SparcliError::NoTerminal`.
+- Every prompt returns `Result<Outcome<T>>`, where [`Outcome`](#outcomet) is
+  `Submitted(T)`, `Cancelled`, or `Shortcut(id)`. Prompts need an interactive
+  terminal and otherwise return `SparcliError::NoTerminal`.
+- Every prompt also has `frame() -> Rendered`: a static, non-interactive
+  render of its configured state (used for previews and README screenshots).
 - Feature-gated items are marked **(feature `x`)**.
 - Import the common types via `use sparcli::prelude::*;`.
 
@@ -19,7 +21,7 @@ The complete public API, grouped by layer. This mirrors the rustdoc
 
 ## Contents
 
-- [Core](#core) — colors, text, geometry, theme, render
+- [Core](#core) – colors, text, geometry, theme, render
 - [Errors](#errors)
 - [Output widgets](#output-widgets)
 - [Input widgets](#input-widgets)
@@ -241,7 +243,7 @@ pub fn write_rendered<W: Write>(
 ) -> std::io::Result<()>;
 ```
 
-### Markup — feature `markup`
+### Markup – feature `markup`
 
 Rich-style `[bold red]…[/]`, `#rrggbb`, `on <color>`, backtick `` `code` ``.
 
@@ -300,9 +302,13 @@ impl Table {
     pub fn row<I, C>(self, cells: I) -> Self where I: IntoIterator<Item = C>, C: Into<Cell>;
     pub fn footer_row<I, C>(self, cells: I) -> Self where I: IntoIterator<Item = C>, C: Into<Cell>;
     pub fn border(self, border: BorderType) -> Self;
+    pub fn border_style(self, style: Style) -> Self;
     pub fn header(self, show: bool) -> Self;
+    pub fn header_style(self, style: Style) -> Self;
     pub fn striped(self, striped: bool) -> Self;
+    pub fn stripe_style(self, style: Style) -> Self;
     pub fn title(self, title: impl Into<Text>) -> Self;
+    pub fn title_style(self, style: Style) -> Self;
     pub fn pad(self, pad: u16) -> Self;
     pub fn row_separators(self, on: bool) -> Self;
 }
@@ -388,6 +394,7 @@ impl Tree {
     pub fn node(self, node: TreeNode) -> Self;
     pub fn border(self, border: BorderType) -> Self;
     pub fn connector_style(self, style: Style) -> Self;
+    pub fn dashes(self, dashes: u16) -> Self; // connector dashes (default 1)
     pub fn no_guides(self) -> Self;
 }
 ```
@@ -512,7 +519,7 @@ impl Live {
 }
 ```
 
-### Pager — feature `pager`
+### Pager – feature `pager`
 
 ```rust
 impl Pager {
@@ -586,6 +593,7 @@ impl TextInput {
 ```rust
 impl PasswordInput {
     pub fn new(prompt: impl Into<String>) -> Self;
+    pub fn initial(self, value: impl Into<String>) -> Self; // for previews
     pub fn mask(self, mask: impl Into<String>) -> Self; // empty hides length
     pub fn max_chars(self, max: usize) -> Self;
     pub fn validate(self, validator: Validator) -> Self;
@@ -632,6 +640,8 @@ impl Select {
     pub fn multi(self) -> Self;
     pub fn max_visible(self, rows: usize) -> Self;
     pub fn no_cycle(self) -> Self;
+    pub fn cursor(self, index: usize) -> Self;            // initial highlight
+    pub fn checked<I: IntoIterator<Item = usize>>(self, indices: I) -> Self;
     pub fn shortcuts<I: IntoIterator<Item = Shortcut>>(self, s: I) -> Self;
     pub fn run(self) -> Result<Outcome<usize>>;
     pub fn run_multi(self) -> Result<Outcome<Vec<usize>>>;
@@ -641,7 +651,7 @@ impl Select {
 `shortcuts` adds a footer hint and a `?` help overlay; a bound key ends the
 prompt with `Outcome::Shortcut(id)`.
 
-### FuzzySelect — feature `fuzzy` → `Outcome<usize>` / `Outcome<Vec<usize>>`
+### FuzzySelect – feature `fuzzy` → `Outcome<usize>` / `Outcome<Vec<usize>>`
 
 ```rust
 impl FuzzySelect {
@@ -649,6 +659,7 @@ impl FuzzySelect {
     pub fn options<I, S>(self, options: I) -> Self;
     pub fn multi(self) -> Self;
     pub fn max_visible(self, rows: usize) -> Self;
+    pub fn query(self, query: impl Into<String>) -> Self; // pre-fill the query
     pub fn shortcuts<I: IntoIterator<Item = Shortcut>>(self, s: I) -> Self;
     pub fn run(self) -> Result<Outcome<usize>>;
     pub fn run_multi(self) -> Result<Outcome<Vec<usize>>>;
