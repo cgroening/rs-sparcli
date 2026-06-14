@@ -43,6 +43,7 @@ fn hero() -> Result<()> {
             Span::styled("columns", cyan),
             Span::raw(" and progress bars, with Rich-compatible "),
             Span::styled("[markup]", yellow),
+            Span::raw("."),
         ]),
     ]);
     Panel::new(body)
@@ -183,15 +184,19 @@ fn right_column() -> Rendered {
             .style(Style::new().fg(Color::Black).bg(color).bold())
             .span()
     };
-    let badges = Rendered::new(vec![Line::new(vec![
-        badge("DONE", Color::Green),
-        Span::raw(" "),
-        badge("INFO", Color::LightBlue),
-        Span::raw(" "),
-        badge("WARN", Color::Yellow),
-        Span::raw(" "),
-        badge("FAIL", Color::Red),
-    ])]);
+    let badges = Rendered::new(vec![
+        Line::new(vec![
+            badge("DONE", Color::Green),
+            Span::raw(" "),
+            badge("INFO", Color::LightBlue),
+        ]),
+        Line::default(),
+        Line::new(vec![
+            badge("WARN", Color::Yellow),
+            Span::raw(" "),
+            badge("FAIL", Color::Red),
+        ]),
+    ]);
 
     let label = |text: &str| {
         Rendered::new(vec![Line::styled(
