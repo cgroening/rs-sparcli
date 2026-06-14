@@ -668,9 +668,13 @@ impl DatePicker {
     pub fn new(prompt: impl Into<String>) -> Self;
     pub fn initial(self, date: Date) -> Self;
     pub fn allow_clear(self) -> Self; // Del/Backspace -> Date::empty()
+    pub fn shortcuts<I: IntoIterator<Item = Shortcut>>(self, s: I) -> Self;
     pub fn run(self) -> Result<Outcome<Date>>;
 }
 ```
+
+`shortcuts` adds a footer hint and a `?` help overlay; a bound key ends the
+prompt with `Outcome::Shortcut(id)`.
 
 ### Validation (`input::validate`)
 

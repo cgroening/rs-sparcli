@@ -16,6 +16,7 @@ use crate::input::event::{
 };
 use crate::input::guard::TerminalGuard;
 use crate::input::prompt::{Flow, run_prompt};
+use crate::input::shortcut::{self, Shortcut};
 
 /// Seconds in a day.
 const SECONDS_PER_DAY: u64 = 86_400;
@@ -130,11 +131,18 @@ fn is_leap(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
+/// Mutable state of a running date picker.
+struct State {
+    date: Date,
+    help: bool,
+}
+
 /// A month-grid date picker prompt.
 pub struct DatePicker {
     prompt: String,
     initial: Date,
     allow_clear: bool,
+    shortcuts: Vec<Shortcut>,
 }
 
 impl DatePicker {
@@ -144,6 +152,7 @@ impl DatePicker {
             prompt: prompt.into(),
             initial: Date::today(),
             allow_clear: false,
+            shortcuts: Vec::new(),
         }
     }
 
@@ -164,6 +173,18 @@ impl DatePicker {
         self
     }
 
+    /// Registers shortcuts shown in a footer hint and the `?` help overlay.
+    ///
+    /// Pressing a bound key ends the prompt with [`Outcome::Shortcut`].
+    #[must_use]
+    pub fn shortcuts<I>(mut self, shortcuts: I) -> Self
+    where
+        I: IntoIterator<Item = Shortcut>,
+    {
+        self.shortcuts = shortcuts.into_iter().collect();
+        self
+    }
+
     /// Runs the picker on the real terminal.
     ///
     /// # Errors
@@ -180,55 +201,75 @@ impl DatePicker {
 
     /// Runs the picker against any event source (used for tests).
     fn run_with(&self, source: &mut impl EventSource) -> Result<Outcome<Date>> {
-        let mut current = self.initial;
+        let mut state = State {
+            date: self.initial,
+            help: false,
+        };
         run_prompt(
             source,
-            &mut current,
-            |date, _| self.render(*date),
-            |date, event| self.handle(date, event),
+            &mut state,
+            |state, _| self.render(state),
+            |state, event| self.handle(state, event),
         )
     }
 
     /// Builds the calendar frame for the selected date.
-    fn render(&self, selected: Date) -> Rendered {
+    fn render(&self, state: &State) -> Rendered {
         let theme = theme();
+        if state.help {
+            return Rendered::new(shortcut::help_overlay(&self.shortcuts));
+        }
         let mut lines = vec![Line::styled(self.prompt.clone(), theme.title)];
-        if selected.is_empty() {
+        if state.date.is_empty() {
             lines.push(Line::styled(
                 "(no date) — press an arrow to choose".to_string(),
                 theme.secondary,
             ));
-            return Rendered::new(lines);
+        } else {
+            lines.push(header_line(state.date, &theme));
+            lines.push(weekday_header(&theme));
+            lines.extend(month_grid(state.date, &theme));
         }
-        lines.push(header_line(selected, &theme));
-        lines.push(weekday_header(&theme));
-        lines.extend(month_grid(selected, &theme));
+        if !self.shortcuts.is_empty() {
+            lines.push(shortcut::hint_line(&self.shortcuts));
+        }
         Rendered::new(lines)
     }
 
     /// Handles one event for the picker.
-    fn handle(&self, date: &mut Date, event: InputEvent) -> Flow<Date> {
+    fn handle(&self, state: &mut State, event: InputEvent) -> Flow<Date> {
         let InputEvent::Key(key) = event else {
             return Flow::Continue;
         };
+        if state.help {
+            state.help = false;
+            return Flow::Continue;
+        }
+        if key.code == KeyCode::Char('?') && !self.shortcuts.is_empty() {
+            state.help = true;
+            return Flow::Continue;
+        }
+        if let Some(id) = shortcut::find(key, &self.shortcuts) {
+            return Flow::Shortcut(id);
+        }
         if matches!(key.code, KeyCode::Esc) {
             return Flow::Cancel;
         }
         if matches!(key.code, KeyCode::Enter) {
-            return Flow::Submit(*date);
+            return Flow::Submit(state.date);
         }
         if self.allow_clear
             && matches!(key.code, KeyCode::Delete | KeyCode::Backspace)
         {
-            *date = Date::empty();
+            state.date = Date::empty();
             return Flow::Continue;
         }
-        if date.is_empty() {
+        if state.date.is_empty() {
             // Any navigation key starts editing from today.
-            *date = Date::today();
+            state.date = Date::today();
             return Flow::Continue;
         }
-        apply_key(date, key)
+        apply_key(&mut state.date, key)
     }
 }
 
@@ -384,6 +425,35 @@ mod tests {
             .initial(Date::new(2026, 6, 14))
             .run_with(&mut ScriptedSource::keys([
                 KeyCode::Delete,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(Date::new(2026, 6, 14)));
+    }
+
+    #[test]
+    fn shortcut_ends_with_its_id() {
+        use crate::input::event::{InputEvent, KeyPress};
+        use crate::input::shortcut::Shortcut;
+        let outcome = DatePicker::new("when")
+            .shortcuts([Shortcut::new(KeyPress::ctrl('t'), 9, "today")])
+            .run_with(&mut ScriptedSource::events([InputEvent::Key(
+                KeyPress::ctrl('t'),
+            )]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Shortcut(9));
+    }
+
+    #[test]
+    fn help_overlay_opens_and_closes() {
+        use crate::input::event::KeyPress;
+        use crate::input::shortcut::Shortcut;
+        let outcome = DatePicker::new("when")
+            .initial(Date::new(2026, 6, 14))
+            .shortcuts([Shortcut::new(KeyPress::ctrl('t'), 1, "today")])
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::Char('?'),
+                KeyCode::Char('x'),
                 KeyCode::Enter,
             ]))
             .unwrap();
