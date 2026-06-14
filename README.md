@@ -36,6 +36,7 @@ sparcli = "0.1"
 | `markup` | `[bold red]…[/]` inline markup parsing            |
 | `fuzzy`  | inline fuzzy-select (pulls in `nucleo-matcher`)   |
 | `pager`  | paging via `$PAGER` / `less` / `more`             |
+| `full`   | enables `markup`, `fuzzy` and `pager`             |
 
 ## Output example
 
@@ -104,6 +105,12 @@ cargo run --example output_gallery --features markup,fuzzy,pager
 cargo run --example output_dynamic --features pager  # spinner/progress/live
 cargo run --example prompts --features fuzzy          # interactive; needs a TTY
 ```
+
+## Documentation
+
+- [`API.md`](API.md) — the complete public API in one place.
+- [`DEVELOPMENT.md`](DEVELOPMENT.md) — building, testing and contributing.
+- `cargo doc --all-features --open` — the canonical rustdoc reference.
 
 ## License
 

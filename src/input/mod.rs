@@ -1,8 +1,9 @@
 //! Interactive input widgets (prompts).
 //!
-//! Each prompt runs a small event loop over an [`EventSource`](event::
-//! EventSource) and redraws in place. Prompts return an [`Outcome`] that is
-//! either a submitted value or a cancellation, and never panic on input.
+//! Each prompt runs a small event loop over an
+//! [`EventSource`](event::EventSource) and redraws in place. Prompts return an
+//! [`Outcome`] that is either a submitted value or a cancellation, and never
+//! panic on input.
 
 pub mod confirm;
 pub mod datepicker;

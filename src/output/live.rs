@@ -1,6 +1,6 @@
 //! In-place redrawing for live displays, progress bars and spinners.
 //!
-//! [`InPlace`] is the shared engine that redraws a [`Rendered`] frame at the
+//! `InPlace` is the shared engine that redraws a [`Rendered`] frame at the
 //! cursor position; [`Live`] is the public widget wrapper. On non-terminals
 //! (pipes, redirects) no control codes are emitted: only the final frame is
 //! printed once, so logs stay clean.
