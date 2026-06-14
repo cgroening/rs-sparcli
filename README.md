@@ -105,7 +105,7 @@ cargo run --example output_gallery --features markup,fuzzy,pager
 cargo run --example output_dynamic --features pager  # spinner/progress/live
 cargo run --example prompts --features fuzzy          # interactive; needs a TTY
 cargo run --example output-readme --features markup   # screenshot collage
-cargo run --example prompt-readme --features fuzzy    # non-interactive prompts
+cargo run --example prompt-readme                     # non-interactive prompts
 ```
 
 ## Documentation

@@ -33,7 +33,7 @@ cargo run --example prompts --features fuzzy
 
 # Curated, non-interactive collages for README screenshots
 cargo run --example output-readme --features markup
-cargo run --example prompt-readme --features fuzzy
+cargo run --example prompt-readme
 ```
 
 The gallery also works without features (those widgets are simply omitted).
