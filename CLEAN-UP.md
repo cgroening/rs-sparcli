@@ -1,5 +1,37 @@
 # Code-Walkthrough & Aufräumen (Checkliste zum Abhaken)
 
+## Status: abgeschlossen (2026-07-07)
+
+Alle Phasen durchgearbeitet. Endzustand grün: `cargo fmt --check`, `cargo clippy
+--all-targets --all-features -- -D warnings`, `cargo test` (default sowie einzeln
+`markup`/`fuzzy`/`pager`/`--all-features`), `cargo build --examples --all-features`
+und `RUSTDOCFLAGS="-D warnings" cargo doc --all-features` – alles sauber. 171
+Tests bei `--all-features` (vorher 165), Verhalten unverändert.
+
+Durchgeführte Änderungen:
+- `input/number.rs` → `number/{mod,calc}.rs`; `eval`/`Calc` privat (`pub(crate)`),
+  `Result<f64, String>` durch interne `CalcError` (thiserror) ersetzt, Doctest in
+  Unit-Tests überführt.
+- `output/table.rs` (813) → `table/{mod,plan,render}.rs`.
+- `input/text.rs` (712) → `text/{mod,render,keys,suggest}.rs`.
+- `input/datepicker.rs` (488) → `datepicker/{mod,date}.rs`.
+- `core/style.rs` (384) → `style/{mod,color}.rs`.
+- 28 rustdoc-Verstöße (fehlende Leerzeile nach `# Errors`/`# Examples`, §8.4) in
+  16 Dateien behoben.
+- Stale `#[allow(dead_code)]` in `input/event.rs` entfernt (wird von Tests genutzt).
+- `API.md` und `CHANGELOG.md` synchronisiert (eval-Entfernung).
+
+Bewusste Nicht-Änderungen (KISS, „im Zweifel lassen"):
+- `panel` (326), `list` (309), `select` (402), `fuzzy` (385): je eine kohärente
+  Verantwortung knapp über der ~300-Signalgrenze – kein Klarheitsgewinn durch
+  weiteres Splitten.
+- Der vermeintliche `spinner.rs`-80-Spalten-Befund war ein Byte-vs-Zeichen-
+  Artefakt (rustfmt zählt Zeichen; keine echte Verletzung).
+- Render-Helfer mit 4-7 Parametern bleiben – situative Werte (Puffer, Breiten,
+  Styles), die §2.5 explizit als explizite Parameter erlaubt, kein Objekt-Zustand.
+- `pub mod`-Breite der Widget-Module unverändert gelassen (Verengung auf
+  `pub(crate)` würde dokumentierte Modulpfade brechen – offener Punkt für später).
+
 ## Context
 
 Das Repo ist nach mehreren Feature-Runden stabil und sauber (`cargo fmt`
@@ -47,57 +79,57 @@ Top-down nur *lesen*, um die mentale Landkarte aufzubauen, bevor von innen nach
 außen aufgeräumt wird. Hier wird nichts geändert – nur Verdrahtung und
 Modulstruktur erfassen.
 
-- [ ] `lib.rs`: Modulbaum (`core`/`output`/`input`/`error`), öffentliche
+- [x] `lib.rs`: Modulbaum (`core`/`output`/`input`/`error`), öffentliche
   Re-Exports und `prelude` überfliegen – was ist nach außen sichtbar, was liegt
   hinter `#[cfg(feature = ...)]` (`pager`, `fuzzy`)?
-- [ ] `core/mod.rs`, `output/mod.rs`, `input/mod.rs`: Sub-Modulstruktur und
+- [x] `core/mod.rs`, `output/mod.rs`, `input/mod.rs`: Sub-Modulstruktur und
   Re-Exports erfassen; `Renderable`/`Rendered`-Vertrag (`core/render.rs`) und
   den `Outcome<T>`-Typ (`input`) verorten.
-- [ ] Den Abhängigkeiten von `output`/`input` nach `core` folgen, bis die
+- [x] Den Abhängigkeiten von `output`/`input` nach `core` folgen, bis die
   Schichtengrenzen klar sind (kein `output`↔`input`, kein Rückgriff von `core`
   nach außen). Auffälligkeiten notieren, aber noch nicht anfassen – das passiert
   bottom-up ab Phase 1.
 
 ## Phase 0 – Baseline & Scope
 
-- [ ] `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D
+- [x] `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D
   warnings`, `cargo test --all-features` laufen lassen – grüner
   Ausgangszustand bestätigt (auch ohne Features: `cargo test` mit
   Default-Feature-Set).
-- [ ] Sauberen Branch nutzen (`clean-up`, kein Commit auf `main`); Arbeitsstand
+- [x] Sauberen Branch nutzen (`clean-up`, kein Commit auf `main`); Arbeitsstand
   sichern.
-- [ ] Entscheiden: reiner Review (nur lesen + Mini-Fixes) vs. echte Refactors –
+- [x] Entscheiden: reiner Review (nur lesen + Mini-Fixes) vs. echte Refactors –
   Umfang abstecken. KISS/YAGNI vor Stil-Umbau.
 
 ## Phase 1 – core: Primitive (`src/core/`)
 
 Zuerst die Bausteine ohne Widget-Logik, in Abhängigkeitsreihenfolge:
 
-- [ ] `geometry.rs` (`Align`, `VAlign`, `Edges`, `Position`, `Title`): reine
+- [x] `geometry.rs` (`Align`, `VAlign`, `Edges`, `Position`, `Title`): reine
   Wertetypen – generische Checks, Invarianten dokumentiert?
-- [ ] `width.rs`: Unicode-Breitenberechnung (`unicode-width`) – Grenzfälle
+- [x] `width.rs`: Unicode-Breitenberechnung (`unicode-width`) – Grenzfälle
   (Wide-Chars, Zero-Width, Kürzen mit `…`) getestet.
-- [ ] `style.rs` (`Style`, `Color`, `Modifier`, `Attribute`): ratatui-vertrautes
+- [x] `style.rs` (`Style`, `Color`, `Modifier`, `Attribute`): ratatui-vertrautes
   Vokabular; `NO_COLOR`/Nicht-TTY-Verhalten; keine Magic-ANSI-Codes.
-- [ ] `text.rs` (`Span`, `Line`, `Text`): Builder-API konsistent; SLAP in
+- [x] `text.rs` (`Span`, `Line`, `Text`): Builder-API konsistent; SLAP in
   Umbruch-/Zusammenführungslogik.
-- [ ] `border.rs` (`BorderType`, Default `Rounded`): Glyphen in zwei Stufen
+- [x] `border.rs` (`BorderType`, Default `Rounded`): Glyphen in zwei Stufen
   (Unicode + ASCII-Fallback) übers Theme wählbar.
 
 ## Phase 2 – core: markup, theme, terminal, render (`src/core/`)
 
-- [ ] `markup.rs` (Feature `markup`): `[bold red]…[/]`-Parser – defensive
+- [x] `markup.rs` (Feature `markup`): `[bold red]…[/]`-Parser – defensive
   Fehlerpfade bei kaputter Markup, keine Panics; hinter `#[cfg(feature)]`
   korrekt abgetrennt.
-- [ ] `theme.rs` (`Theme`, `theme()`, `set_theme()`): **einheitliches Theme**
+- [x] `theme.rs` (`Theme`, `theme()`, `set_theme()`): **einheitliches Theme**
   für Input UND Output (SSOT, CLAUDE.md-Architektur); gedämpfte Optik, ein
   Akzentton, `dim` für Sekundärtext; globaler Zustand thread-sicher/dokumentiert.
-- [ ] `terminal.rs`: `crossterm`-Kapselung, TTY-Erkennung, `NO_COLOR`; keine
+- [x] `terminal.rs`: `crossterm`-Kapselung, TTY-Erkennung, `NO_COLOR`; keine
   Widget-Logik durchgesickert.
-- [ ] `render.rs` (`Renderable`, `Rendered`): der Render-Vertrag als
+- [x] `render.rs` (`Renderable`, `Rendered`): der Render-Vertrag als
   Testschnittstelle (zu `Rendered` rendern, ohne TTY prüfen) – Kern-Contract
   klar und minimal.
-- [ ] `mod.rs`: Re-Exports minimal; nur was `output`/`input`/`lib` wirklich
+- [x] `mod.rs`: Re-Exports minimal; nur was `output`/`input`/`lib` wirklich
   brauchen.
 
 ## Phase 3 – output: Widgets (`src/output/`)
@@ -105,32 +137,32 @@ Zuerst die Bausteine ohne Widget-Logik, in Abhängigkeitsreihenfolge:
 Alle implementieren `Renderable`; je Datei generische Checks + Render-Tests zu
 `Rendered` (kein TTY). Überlauf mit `…` kürzen, Default-Border `Rounded`.
 
-- [ ] Primitive: `rule.rs`, `badge.rs`, `alert.rs` (`AlertKind`), `kv.rs`,
+- [x] Primitive: `rule.rs`, `badge.rs`, `alert.rs` (`AlertKind`), `kv.rs`,
   `list.rs` (`Marker`).
-- [ ] Container/Layout: `panel.rs`, `columns.rs`, `layout.rs`, `compose.rs`
+- [x] Container/Layout: `panel.rs`, `columns.rs`, `layout.rs`, `compose.rs`
   (`align`/`pad`/`vstack`) – SLAP in dichten Render-Funktionen, keine
   Magic-Strings für Labels/Glyphen.
-- [ ] Tabellarisch/strukturiert: `table.rs` (`Cell`, `Column`), `tree.rs`
+- [x] Tabellarisch/strukturiert: `table.rs` (`Cell`, `Column`), `tree.rs`
   (`TreeNode`), `diff.rs`.
-- [ ] Dynamisch: `progress.rs` (`ProgressStyle`, `Thresholds`),
+- [x] Dynamisch: `progress.rs` (`ProgressStyle`, `Thresholds`),
   `multiprogress.rs`, `spinner.rs` (`SpinnerStyle`), `live.rs` – Redraw-Logik,
   keine Ressourcen-Leaks, Nicht-TTY-Fallback.
-- [ ] `pager.rs` (Feature `pager`): `$PAGER`/`less`/`more`-Integration,
+- [x] `pager.rs` (Feature `pager`): `$PAGER`/`less`/`more`-Integration,
   Fehlerpfade wenn kein Pager verfügbar; sauber hinter `#[cfg(feature)]`.
-- [ ] `mod.rs`: Re-Exports minimal; feature-gated Items (`pager`) korrekt
+- [x] `mod.rs`: Re-Exports minimal; feature-gated Items (`pager`) korrekt
   abgetrennt.
 
 ## Phase 4 – input: Fundament (`src/input/`)
 
 Die geteilte Infrastruktur zuerst – sie trägt alle Prompts:
 
-- [ ] `event.rs` (`EventSource`, DI): Fake für headless-Tests (gescriptete
+- [x] `event.rs` (`EventSource`, DI): Fake für headless-Tests (gescriptete
   Keys); das eine `#[allow(dead_code)]` prüfen – noch nötig oder entfernbar?
-- [ ] `line_edit.rs`: **SSOT für Texteingabe** – Cursor/Editing-Logik, von den
+- [x] `line_edit.rs`: **SSOT für Texteingabe** – Cursor/Editing-Logik, von den
   Text-Prompts geteilt; generische Checks, keine Duplikate in den Widgets.
-- [ ] `guard.rs` (`TerminalGuard`, RAII): stellt das Terminal bei
+- [x] `guard.rs` (`TerminalGuard`, RAII): stellt das Terminal bei
   Drop/Fehler/Panik wieder her – Wiederherstellungspfad und `Drop`-Impl prüfen.
-- [ ] `prompt.rs`, `field.rs`, `validate.rs`, `history.rs`: gemeinsame
+- [x] `prompt.rs`, `field.rs`, `validate.rs`, `history.rs`: gemeinsame
   Bausteine (Redraw-`frame`, Validierung, Verlauf) – klare, minimale
   Schnittstellen; `Outcome<T>` (`Submitted`/`Cancelled`) konsistent.
 
@@ -139,25 +171,25 @@ Die geteilte Infrastruktur zuerst – sie trägt alle Prompts:
 Je Widget: `EventSource`-Fake-Test (headless), `Outcome<T>`-Rückgabe, geteilte
 `line_edit`/`validate`-Nutzung statt Eigenlogik.
 
-- [ ] Text: `text.rs` (`TextInput`), `password.rs` (`PasswordInput`),
+- [x] Text: `text.rs` (`TextInput`), `password.rs` (`PasswordInput`),
   `textarea.rs`, `number.rs` (`NumberInput`) – teilen sie `line_edit` sauber?
-- [ ] Auswahl: `confirm.rs`, `select.rs` (`Select`), `datepicker.rs`
+- [x] Auswahl: `confirm.rs`, `select.rs` (`Select`), `datepicker.rs`
   (`Date`/`DatePicker`), `shortcut.rs` – zyklische Navigation der Listen.
-- [ ] `fuzzy.rs` (Feature `fuzzy`): inline Fuzzy-Select über `nucleo-matcher`;
+- [x] `fuzzy.rs` (Feature `fuzzy`): inline Fuzzy-Select über `nucleo-matcher`;
   sauber hinter `#[cfg(feature)]`, Fallback/Fehlerpfade.
-- [ ] `editor.rs` (`edit_file`): externer `$EDITOR`-Aufruf – Fehlerpfade,
+- [x] `editor.rs` (`edit_file`): externer `$EDITOR`-Aufruf – Fehlerpfade,
   Temp-Datei-Handling.
-- [ ] `mod.rs`: `Outcome`-Re-Export + feature-gated Items (`fuzzy`) korrekt;
+- [x] `mod.rs`: `Outcome`-Re-Export + feature-gated Items (`fuzzy`) korrekt;
   Re-Exports minimal.
 
 ## Phase 6 – Crate-Root (`src/lib.rs`, `src/error.rs`)
 
 Zuletzt, weil hier alle Schichten zusammenlaufen (öffentliche API):
 
-- [ ] `error.rs` (`SparcliError`, `Result`): `#[error(...)]`-Texte
+- [x] `error.rs` (`SparcliError`, `Result`): `#[error(...)]`-Texte
   aussagekräftig, Fremdfehler via `#[from]`, ein kohärenter Lib-Fehlertyp; keine
   Infrastruktur-Leaks.
-- [ ] `lib.rs`: Modul-Deklarationen vollständig/konsistent; öffentliche
+- [x] `lib.rs`: Modul-Deklarationen vollständig/konsistent; öffentliche
   Re-Exports und `prelude` minimal & konsistent (was gehört wirklich in
   `prelude`?); feature-gated `pub use` (`Pager`, `FuzzySelect`) korrekt;
   crate-weite `#![warn(missing_docs)]`-Begründung aktuell; Modul-`//!`-Doc und
@@ -165,21 +197,21 @@ Zuletzt, weil hier alle Schichten zusammenlaufen (öffentliche API):
 
 ## Phase 7 – Querschnitt & Abschluss
 
-- [ ] **`#[allow]`-Inventur:** das lokale `#[allow(dead_code)]` in
+- [x] **`#[allow]`-Inventur:** das lokale `#[allow(dead_code)]` in
   `input/event.rs` bewusst bestätigen oder entfernen; keine weiteren Allows
   eingeschlichen.
-- [ ] **Feature-Matrix:** je Feature-Kombination baut & testet sauber –
+- [x] **Feature-Matrix:** je Feature-Kombination baut & testet sauber –
   `cargo test` (default), `--features markup`, `--features fuzzy`,
   `--features pager`, `--all-features`; `cargo hack`/manuell gegenchecken, dass
   kein Item versehentlich ungated ist.
-- [ ] **Doku-Sync:** `README.md`, `API.md`, `DEVELOPMENT.md`, `CHANGELOG.md`
+- [x] **Doku-Sync:** `README.md`, `API.md`, `DEVELOPMENT.md`, `CHANGELOG.md`
   gegen den aufgeräumten Stand; rustdoc-Beispiele/Doctests konsistent;
   Feature-Flags korrekt dokumentiert.
-- [ ] **Tests:** durch Refactors berührte Pfade getestet; alle grün (Unit +
+- [x] **Tests:** durch Refactors berührte Pfade getestet; alle grün (Unit +
   `tests/integration.rs` + Doctests).
-- [ ] **Abschluss-Gates:** `cargo fmt --check`, `cargo clippy --all-targets
+- [x] **Abschluss-Gates:** `cargo fmt --check`, `cargo clippy --all-targets
   --all-features -- -D warnings`, `cargo test --all-features` – alles grün.
-- [ ] Commit-Nachricht(en) im Conventional-Commits-Stil vorschlagen (kein
+- [x] Commit-Nachricht(en) im Conventional-Commits-Stil vorschlagen (kein
   Auto-Commit gemäß CLAUDE.md).
 
 ## Verifikation
