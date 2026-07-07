@@ -16,6 +16,7 @@ use crate::error::{Result, SparcliError};
 /// platform default is used. The command is whitespace-split (no shell).
 ///
 /// # Errors
+///
 /// Returns [`SparcliError::Io`] if the editor cannot be spawned, or
 /// [`SparcliError::Config`] if the resolved command is empty.
 pub fn edit_file(command: Option<&str>, path: &Path) -> Result<()> {
@@ -34,6 +35,7 @@ pub fn edit_file(command: Option<&str>, path: &Path) -> Result<()> {
 /// detection. Returns the edited contents.
 ///
 /// # Errors
+///
 /// Returns [`SparcliError::Io`] on temp-file or spawn failure.
 pub(crate) fn edit_text(
     command: Option<&str>,

@@ -106,6 +106,7 @@ impl FuzzySelect {
     /// Runs a single-select fuzzy prompt, returning the chosen index.
     ///
     /// # Errors
+    ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<usize>> {
@@ -123,6 +124,7 @@ impl FuzzySelect {
     /// Runs a multi-select fuzzy prompt, returning all checked indices.
     ///
     /// # Errors
+    ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run_multi(self) -> Result<Outcome<Vec<usize>>> {

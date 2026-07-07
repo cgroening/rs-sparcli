@@ -88,6 +88,7 @@ impl Spinner {
     /// Advances to the next frame and redraws it in place.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn tick(&mut self) -> Result<()> {
         let frame = self.frame();
@@ -101,6 +102,7 @@ impl Spinner {
     /// Stops the spinner with a success or failure marker.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn finish(
         mut self,

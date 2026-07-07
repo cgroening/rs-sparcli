@@ -73,6 +73,7 @@ impl Confirm {
     /// Runs the prompt on the real terminal.
     ///
     /// # Errors
+    ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<bool>> {

@@ -614,9 +614,6 @@ impl NumberInput {
     pub fn calculator(self) -> Self; // accept `+ - * / ( )` expressions
     pub fn run(self) -> Result<Outcome<f64>>;
 }
-
-// Standalone expression evaluator (also used by calculator mode):
-pub fn eval(expr: &str) -> Result<f64, String>;
 ```
 
 ### Textarea → `Outcome<String>`

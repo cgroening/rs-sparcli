@@ -180,6 +180,7 @@ impl ProgressBar {
     /// Draws the bar in place (animated when on a terminal).
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn draw(&mut self, value: f64, max: f64) -> Result<()> {
         let frame = self.bar(value, max);
@@ -191,6 +192,7 @@ impl ProgressBar {
     /// Draws the final bar and ends the in-place session with a newline.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn finish(mut self, value: f64, max: f64) -> Result<()> {
         let frame = self.bar(value, max);

@@ -93,6 +93,7 @@ impl History {
     /// Loads entries from the backing file, if configured.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if the file exists but cannot be
     /// read.
     pub fn load(&mut self) -> Result<()> {
@@ -110,6 +111,7 @@ impl History {
     /// Saves entries to the backing file, creating directories as needed.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn save(&self) -> Result<()> {
         let Some(path) = &self.path else {

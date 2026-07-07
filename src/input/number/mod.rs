@@ -1,5 +1,7 @@
 //! Numeric input with bounds, step adjustment and a calculator mode.
 
+mod calc;
+
 use crate::core::render::Rendered;
 use crate::core::style::Style;
 use crate::core::terminal::is_input_tty;
@@ -10,6 +12,7 @@ use crate::input::event::{CrosstermSource, EventSource, InputEvent, KeyPress};
 use crate::input::field::{error_line, field_line, value_line};
 use crate::input::guard::TerminalGuard;
 use crate::input::line_edit::LineEditor;
+use crate::input::number::calc::{CalcError, eval, parse_number};
 use crate::input::prompt::{Flow, run_prompt};
 
 /// Mutable state of a running number prompt.
@@ -82,6 +85,7 @@ impl NumberInput {
     /// Runs the prompt on the real terminal.
     ///
     /// # Errors
+    ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<f64>> {
@@ -194,12 +198,12 @@ impl NumberInput {
         let parsed = if self.calculator {
             eval(&text)
         } else {
-            parse_number(&text).ok_or_else(|| "not a number".to_string())
+            parse_number(&text).ok_or(CalcError::NotANumber)
         };
         match parsed {
             Ok(value) => Flow::Submit(self.clamp(value)),
-            Err(message) => {
-                state.error = Some(message);
+            Err(error) => {
+                state.error = Some(error.to_string());
                 Flow::Continue
             }
         }
@@ -213,135 +217,6 @@ impl NumberInput {
     /// Formats `value` with the configured number of decimals.
     fn format(&self, value: f64) -> String {
         format!("{value:.*}", self.decimals)
-    }
-}
-
-/// Parses a number, accepting `,` or `.` as the decimal separator.
-fn parse_number(text: &str) -> Option<f64> {
-    let normalized = text.trim().replace(',', ".");
-    if normalized.is_empty() {
-        return None;
-    }
-    normalized.parse().ok()
-}
-
-/// Evaluates an arithmetic expression with `+ - * / ( )`.
-///
-/// Accepts `,` or `.` as the decimal separator. Returns an error message on
-/// malformed input or division by zero.
-///
-/// # Examples
-/// ```
-/// # use sparcli::input::number::eval;
-/// assert_eq!(eval("2 + 3 * 4").unwrap(), 14.0);
-/// ```
-pub fn eval(expr: &str) -> std::result::Result<f64, String> {
-    let normalized = expr.replace(',', ".");
-    let mut parser = Calc {
-        chars: normalized.chars().collect(),
-        pos: 0,
-    };
-    let value = parser.expression()?;
-    parser.skip_spaces();
-    if parser.pos != parser.chars.len() {
-        return Err("unexpected trailing input".to_string());
-    }
-    Ok(value)
-}
-
-/// A minimal recursive-descent arithmetic parser.
-struct Calc {
-    chars: Vec<char>,
-    pos: usize,
-}
-
-impl Calc {
-    /// Parses `term (('+'|'-') term)*`.
-    fn expression(&mut self) -> std::result::Result<f64, String> {
-        let mut value = self.term()?;
-        loop {
-            self.skip_spaces();
-            match self.peek() {
-                Some('+') => {
-                    self.pos += 1;
-                    value += self.term()?;
-                }
-                Some('-') => {
-                    self.pos += 1;
-                    value -= self.term()?;
-                }
-                _ => break,
-            }
-        }
-        Ok(value)
-    }
-
-    /// Parses `factor (('*'|'/') factor)*`.
-    fn term(&mut self) -> std::result::Result<f64, String> {
-        let mut value = self.factor()?;
-        loop {
-            self.skip_spaces();
-            match self.peek() {
-                Some('*') => {
-                    self.pos += 1;
-                    value *= self.factor()?;
-                }
-                Some('/') => {
-                    self.pos += 1;
-                    let divisor = self.factor()?;
-                    if divisor == 0.0 {
-                        return Err("division by zero".to_string());
-                    }
-                    value /= divisor;
-                }
-                _ => break,
-            }
-        }
-        Ok(value)
-    }
-
-    /// Parses a number, parenthesized expression or unary minus.
-    fn factor(&mut self) -> std::result::Result<f64, String> {
-        self.skip_spaces();
-        match self.peek() {
-            Some('(') => {
-                self.pos += 1;
-                let value = self.expression()?;
-                self.skip_spaces();
-                if self.peek() != Some(')') {
-                    return Err("missing closing parenthesis".to_string());
-                }
-                self.pos += 1;
-                Ok(value)
-            }
-            Some('-') => {
-                self.pos += 1;
-                Ok(-self.factor()?)
-            }
-            _ => self.number(),
-        }
-    }
-
-    /// Parses a decimal number literal.
-    fn number(&mut self) -> std::result::Result<f64, String> {
-        let start = self.pos;
-        while matches!(self.peek(), Some(c) if c.is_ascii_digit() || c == '.') {
-            self.pos += 1;
-        }
-        let text: String = self.chars[start..self.pos].iter().collect();
-        text.parse().map_err(|_| "invalid number".to_string())
-    }
-
-    /// Returns the current character without consuming it.
-    fn peek(&self) -> Option<char> {
-        self.chars.get(self.pos).copied()
-    }
-
-    /// Skips spaces.
-    fn skip_spaces(&mut self) {
-        while self.peek() == Some(' ') {
-            self.pos += 1;
-        }
     }
 }
 
@@ -386,26 +261,24 @@ mod tests {
     }
 
     #[test]
+    fn calculator_evaluates_expression_on_submit() {
+        let outcome = NumberInput::new("n")
+            .calculator()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::Char('2'),
+                KeyCode::Char('+'),
+                KeyCode::Char('3'),
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(5.0));
+    }
+
+    #[test]
     fn esc_cancels() {
         let outcome = NumberInput::new("n")
             .run_with(&mut ScriptedSource::keys([KeyCode::Esc]))
             .unwrap();
         assert_eq!(outcome, Outcome::Cancelled);
-    }
-
-    #[test]
-    fn eval_respects_precedence() {
-        assert_eq!(eval("2 + 3 * 4").unwrap(), 14.0);
-        assert_eq!(eval("(2 + 3) * 4").unwrap(), 20.0);
-    }
-
-    #[test]
-    fn eval_reports_division_by_zero() {
-        assert!(eval("1 / 0").is_err());
-    }
-
-    #[test]
-    fn eval_accepts_comma_decimal() {
-        assert_eq!(eval("1,5 + 1,5").unwrap(), 3.0);
     }
 }

@@ -150,6 +150,7 @@ impl Live {
     /// Redraws with new content.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn update(&mut self, content: &impl Renderable) -> Result<()> {
         self.inplace.draw(&content.render(term_width()))
@@ -158,6 +159,7 @@ impl Live {
     /// Ends the session, leaving the final frame visible.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn finish(self) -> Result<()> {
         self.inplace.finish()
@@ -166,6 +168,7 @@ impl Live {
     /// Ends the session, erasing the display.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn clear(self) -> Result<()> {
         self.inplace.clear()

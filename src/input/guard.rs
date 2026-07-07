@@ -19,6 +19,7 @@ impl TerminalGuard {
     /// Enables raw mode and bracketed paste.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if raw mode cannot be enabled.
     pub fn new() -> Result<Self> {
         enable_raw_mode()?;

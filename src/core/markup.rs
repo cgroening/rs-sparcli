@@ -17,6 +17,7 @@ use crate::error::Result;
 /// emitted literally, so this never fails on arbitrary input.
 ///
 /// # Examples
+///
 /// ```
 /// # use sparcli::core::markup::parse;
 /// let text = parse("[bold]hi[/] there");
@@ -30,6 +31,7 @@ pub fn parse(markup: &str) -> Text {
 /// beyond the text's own lines).
 ///
 /// # Errors
+///
 /// Returns [`crate::SparcliError::Io`] if writing fails.
 pub fn markup_print(markup: &str) -> Result<()> {
     parse(markup).print()
@@ -38,6 +40,7 @@ pub fn markup_print(markup: &str) -> Result<()> {
 /// Parses `markup`, prints it and appends a final newline.
 ///
 /// # Errors
+///
 /// Returns [`crate::SparcliError::Io`] if writing fails.
 pub fn markup_println(markup: &str) -> Result<()> {
     let mut text = parse(markup);

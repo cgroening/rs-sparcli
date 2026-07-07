@@ -57,6 +57,7 @@ impl MultiProgress {
     /// Out-of-range indices are ignored.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn update(&mut self, index: usize, value: f64, max: f64) -> Result<()> {
         if let Some(state) = self.bars.get_mut(index) {
@@ -70,6 +71,7 @@ impl MultiProgress {
     /// Ends the session, leaving or erasing the bars.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn finish(self) -> Result<()> {
         if self.transient {

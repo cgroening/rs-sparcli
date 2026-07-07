@@ -104,6 +104,7 @@ pub trait EventSource {
     /// Blocks until the next event is available.
     ///
     /// # Errors
+    ///
     /// Returns an error if the underlying terminal read fails.
     fn next_event(&mut self) -> Result<InputEvent>;
 
@@ -186,7 +187,6 @@ impl ScriptedSource {
     }
 
     /// Builds a source from explicit events.
-    #[allow(dead_code)]
     pub(crate) fn events(events: impl IntoIterator<Item = InputEvent>) -> Self {
         Self {
             events: events.into_iter().collect(),

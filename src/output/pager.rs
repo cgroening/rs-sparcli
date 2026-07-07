@@ -55,6 +55,7 @@ impl Pager {
     /// Pages `content`, falling back to a direct print off-terminal.
     ///
     /// # Errors
+    ///
     /// Returns [`SparcliError::Io`] if spawning the pager or writing fails,
     /// or [`SparcliError::Config`] if the pager command is empty.
     pub fn page(&self, content: &impl Renderable) -> Result<()> {

@@ -116,6 +116,7 @@ impl Select {
     /// Runs a single-select prompt, returning the chosen index.
     ///
     /// # Errors
+    ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<usize>> {
@@ -133,6 +134,7 @@ impl Select {
     /// Runs a multi-select prompt, returning all checked indices.
     ///
     /// # Errors
+    ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run_multi(self) -> Result<Outcome<Vec<usize>>> {

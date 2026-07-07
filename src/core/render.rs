@@ -68,6 +68,7 @@ pub trait Renderable {
     /// Renders at the current terminal width and prints to standard output.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing to stdout fails.
     fn print(&self) -> Result<()> {
         let rendered = self.render(term_width());
@@ -82,6 +83,7 @@ pub trait Renderable {
     /// Useful for redirecting output to a file or in-memory buffer.
     ///
     /// # Errors
+    ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     fn print_to<W: Write>(&self, writer: &mut W) -> Result<()> {
         let rendered = self.render(term_width());
