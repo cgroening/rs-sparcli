@@ -13,7 +13,7 @@ use sparcli::{
 };
 
 #[cfg(feature = "markup")]
-use sparcli::core::markup::markup_println;
+use sparcli::markup::markup_println;
 
 fn main() -> Result<()> {
     styled_text()?;

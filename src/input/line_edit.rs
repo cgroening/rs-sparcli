@@ -48,11 +48,6 @@ impl LineEditor {
         self.chars.len()
     }
 
-    /// Returns `true` if the buffer is empty.
-    pub fn is_empty(&self) -> bool {
-        self.chars.is_empty()
-    }
-
     /// Returns the caret position as a character index.
     pub fn cursor(&self) -> usize {
         self.cursor
@@ -76,11 +71,6 @@ impl LineEditor {
             }
         }
         (line, col)
-    }
-
-    /// Returns `true` if a non-empty selection exists.
-    pub fn has_selection(&self) -> bool {
-        matches!(self.anchor, Some(anchor) if anchor != self.cursor)
     }
 
     /// Returns the selection range as `(start, end)` if any.

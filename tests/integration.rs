@@ -4,8 +4,8 @@
 //! visible text (ANSI stripped), so the assertions hold whether or not the
 //! test process has a color-capable terminal.
 
-use sparcli::core::width::strip_ansi;
 use sparcli::prelude::*;
+use sparcli::width::strip_ansi;
 use sparcli::{Alert, List, Marker, Panel, Table, Tree, TreeNode};
 
 /// Renders a widget and returns its visible text (no ANSI escapes).

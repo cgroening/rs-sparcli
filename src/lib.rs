@@ -10,19 +10,19 @@
 //! The base crate stays small; heavier features live behind cargo features
 //! (`markup`, `fuzzy`, `pager`).
 //!
-//! [`Style`]: core::style::Style
-//! [`Color`]: core::style::Color
-//! [`Span`]: core::text::Span
-//! [`Line`]: core::text::Line
-//! [`Text`]: core::text::Text
-//! [`Renderable`]: core::render::Renderable
+//! [`Style`]: crate::Style
+//! [`Color`]: crate::Color
+//! [`Span`]: crate::Span
+//! [`Line`]: crate::Line
+//! [`Text`]: crate::Text
+//! [`Renderable`]: crate::Renderable
 
 #![warn(missing_docs)]
 
-pub mod core;
-pub mod error;
-pub mod input;
-pub mod output;
+pub(crate) mod core;
+pub(crate) mod error;
+pub(crate) mod input;
+pub(crate) mod output;
 
 pub use core::border::BorderType;
 pub use core::geometry::{Align, Edges, Position, Title, VAlign};
@@ -63,6 +63,48 @@ pub use input::textarea::Textarea;
 
 #[cfg(feature = "fuzzy")]
 pub use input::fuzzy::FuzzySelect;
+
+/// Rich-style inline markup parsing (`[bold red]text[/]`).
+#[cfg(feature = "markup")]
+pub mod markup {
+    pub use crate::core::markup::{markup_print, markup_println, parse};
+}
+
+/// Value validators and character filters for text prompts.
+pub mod validate {
+    pub use crate::input::validate::{
+        CharFilter, Validator, alnum, alpha, decimal, digits, min_len,
+        no_space, non_empty,
+    };
+}
+
+/// Keyboard events and the dependency-injected event source (for headless
+/// testing and custom input backends).
+pub mod event {
+    pub use crate::input::event::{
+        CrosstermSource, EventSource, InputEvent, KeyCode, KeyPress,
+    };
+}
+
+/// Keyboard shortcuts and their footer-hint / help-overlay rendering.
+pub mod shortcut {
+    pub use crate::input::shortcut::{
+        Shortcut, find, help_overlay, hint_line, key_name,
+    };
+}
+
+/// Unicode-aware display-width helpers (width, ANSI stripping, wrap, truncate).
+pub mod width {
+    pub use crate::core::width::{strip_ansi, truncate, visible_width, wrap};
+}
+
+/// Terminal capability and size detection.
+pub mod terminal {
+    pub use crate::core::terminal::{
+        ColorSupport, color_support, is_input_tty, is_output_tty, term_height,
+        term_width, terminal_size,
+    };
+}
 
 /// Commonly used types, re-exported for `use sparcli::prelude::*;`.
 pub mod prelude {

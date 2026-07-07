@@ -81,8 +81,8 @@ pipe, a file, or with `NO_COLOR`), no escape codes are emitted.
 ## Input example
 
 ```rust
+use sparcli::validate::non_empty;
 use sparcli::{Confirm, Outcome, TextInput};
-use sparcli::input::validate::non_empty;
 
 fn main() -> sparcli::Result<()> {
     if let Outcome::Submitted(name) =

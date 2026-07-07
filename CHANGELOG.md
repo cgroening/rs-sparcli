@@ -7,10 +7,12 @@ All notable changes to this project are documented here. The format is based on 
 ### Removed
 
 - The public `eval` expression evaluator from `input::number`. Arithmetic parsing is now an internal detail of `NumberInput::calculator` and reports a typed internal error instead of a `String`.
+- `LineEditor` and `TerminalGuard` are no longer part of the public API; they are internal implementation details.
 
 ### Changed
 
 - Internal reorganization of the largest modules into focused submodules – `output::table`, `input::text`, `input::number`, `input::datepicker` and `core::style` – with no change to the public API beyond the `eval` removal above.
+- Curated the public surface: the internal layer tree (`core`/`input`/`output`) is no longer public. Types are used via the crate root (`sparcli::Table`, `sparcli::Style`, …); the free-function utilities moved from `sparcli::{core, input, output}::…` to dedicated modules `sparcli::{markup, validate, event, shortcut, width, terminal}`. The `prelude` is unchanged.
 
 ## [0.1.2] - 2026-06-14
 

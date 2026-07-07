@@ -691,7 +691,7 @@ impl DatePicker {
 `shortcuts` adds a footer hint and a `?` help overlay; a bound key ends the
 prompt with `Outcome::Shortcut(id)`.
 
-### Validation (`input::validate`)
+### Validation (`sparcli::validate`)
 
 ```rust
 pub type Validator = Box<dyn Fn(&str) -> Result<(), String>>;
@@ -706,7 +706,7 @@ pub fn alnum() -> CharFilter;
 pub fn no_space() -> CharFilter;
 ```
 
-### History (`input::history`)
+### History
 
 ```rust
 impl History {
@@ -723,7 +723,7 @@ impl History {
 }
 ```
 
-### Shortcuts (`input::shortcut`)
+### Shortcuts (`sparcli::shortcut`)
 
 ```rust
 pub struct Shortcut { pub key: KeyPress, pub id: i32, pub label: String }
@@ -738,7 +738,7 @@ pub fn key_name(key: KeyPress) -> String;           // e.g. "Ctrl-S"
 `Select` and `FuzzySelect` accept `.shortcuts(...)` directly; the standalone
 helpers above are for building your own prompt loops.
 
-### External editor (`input::editor`)
+### External editor
 
 ```rust
 // Open an external editor ($VISUAL / $EDITOR, or an override) on a file:
@@ -748,7 +748,7 @@ pub fn edit_file(command: Option<&str>, path: &Path) -> Result<()>;
 Text prompts call this internally for Ctrl-G; `edit_file` is exposed for
 standalone use.
 
-### Events (`input::event`)
+### Events (`sparcli::event`)
 
 ```rust
 pub enum KeyCode {
@@ -768,53 +768,4 @@ pub enum InputEvent { Key(KeyPress), Paste(String), Resize }
 
 pub trait EventSource { fn next_event(&mut self) -> Result<InputEvent>; }
 pub struct CrosstermSource; // the real terminal source
-```
-
-### LineEditor (`input::line_edit`)
-
-The shared single-/multi-line text-editing core (caret + selection +
-in-process clipboard). Useful when building a custom prompt.
-
-```rust
-impl LineEditor {
-    pub fn new(initial: &str, multiline: bool) -> Self;
-    pub fn value(&self) -> String;
-    pub fn set_value(&mut self, value: &str);
-    pub fn len(&self) -> usize;
-    pub fn is_empty(&self) -> bool;
-    pub fn cursor(&self) -> usize;
-    pub fn lines(&self) -> Vec<String>;
-    pub fn cursor_line_col(&self) -> (usize, usize);
-    pub fn has_selection(&self) -> bool;
-    pub fn selection_range(&self) -> Option<(usize, usize)>;
-    pub fn insert_char(&mut self, ch: char);
-    pub fn insert_str(&mut self, text: &str);
-    pub fn insert_newline(&mut self);
-    pub fn backspace(&mut self);
-    pub fn delete(&mut self);
-    pub fn move_left(&mut self, select: bool);
-    pub fn move_right(&mut self, select: bool);
-    pub fn move_home(&mut self, select: bool);
-    pub fn move_end(&mut self, select: bool);
-    pub fn move_up(&mut self, select: bool);
-    pub fn move_down(&mut self, select: bool);
-    pub fn select_all(&mut self);
-    pub fn delete_word_back(&mut self);
-    pub fn kill_to_line_start(&mut self);
-    pub fn kill_to_line_end(&mut self);
-    pub fn copy(&mut self);
-    pub fn cut(&mut self);
-    pub fn paste(&mut self);
-}
-```
-
-### TerminalGuard (`input::guard`)
-
-RAII: enables raw mode + bracketed paste on `new`, restores both on drop
-(even on early return or panic).
-
-```rust
-impl TerminalGuard {
-    pub fn new() -> Result<Self>;
-}
 ```

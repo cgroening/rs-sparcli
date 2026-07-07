@@ -4,9 +4,9 @@
 //! Each prompt runs in turn; pressing Esc (or Ctrl-C) cancels and ends the
 //! demo cleanly.
 
-use sparcli::input::event::{KeyCode, KeyPress};
-use sparcli::input::shortcut::{self, Shortcut};
-use sparcli::input::validate::{alnum, non_empty};
+use sparcli::event::{KeyCode, KeyPress};
+use sparcli::shortcut::{self, Shortcut};
+use sparcli::validate::{alnum, non_empty};
 use sparcli::{
     Alert, Confirm, DatePicker, NumberInput, Outcome, PasswordInput,
     Renderable, Rendered, Select, TextInput, Textarea,

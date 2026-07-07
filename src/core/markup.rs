@@ -19,7 +19,7 @@ use crate::error::Result;
 /// # Examples
 ///
 /// ```
-/// # use sparcli::core::markup::parse;
+/// # use sparcli::markup::parse;
 /// let text = parse("[bold]hi[/] there");
 /// assert_eq!(text.lines[0].spans[0].content, "hi");
 /// ```
