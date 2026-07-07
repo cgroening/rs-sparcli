@@ -1,5 +1,12 @@
 # Code-Walkthrough & Aufräumen (Checkliste zum Abhaken)
 
+> Archiv-Dokument. Diese Checkliste ist abgeschlossen und beschreibt den
+> damaligen Stand. Die seinerzeit flachen Dateien `core/style.rs`,
+> `output/table.rs`, `input/text.rs`, `input/number.rs` und
+> `input/datepicker.rs` sind inzwischen Verzeichnis-Module; danach folgten die
+> API-Kuratierung (interner Modulbaum `pub(crate)`, Facade-Module) und das
+> `log`-Facade-Logging. Der aktuelle Aufbau steht in `../DEVELOPMENT.md`.
+
 ## Status: abgeschlossen (2026-07-07)
 
 Alle Phasen durchgearbeitet. Endzustand grün: `cargo fmt --check`, `cargo clippy

@@ -191,7 +191,7 @@ pub fn theme() -> Theme;          // current theme (clone)
 pub fn set_theme(new_theme: Theme); // replace process-wide theme
 ```
 
-### Width helpers
+### Width helpers (`sparcli::width`)
 
 ```rust
 pub fn visible_width(text: &str) -> usize;       // ANSI-aware column width
@@ -200,7 +200,7 @@ pub fn truncate(text: &str, max_cols: usize, ellipsis: &str) -> String;
 pub fn wrap(text: &str, width: usize) -> Vec<String>;
 ```
 
-### Terminal
+### Terminal (`sparcli::terminal`)
 
 ```rust
 pub enum ColorSupport { None, Ansi16, TrueColor }

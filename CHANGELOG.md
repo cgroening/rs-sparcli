@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-07
+
 ### Added
 
 - Lightweight `log`-facade diagnostics (`warn!`/`debug!`) at previously swallowed error points (terminal restore, input-history save/load, temp-file cleanup, editor raw-mode toggles). No logger or backend is forced on consumers, and errors already surfaced via `SparcliError` are not double-logged.

@@ -1,15 +1,16 @@
 [package]
 name = "sparcli"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
+authors = ["Corvin Gröning"]
 description = "Lightweight, cross-platform toolkit for styled CLI output and interactive input widgets"
 license = "MIT"
 repository = "https://github.com/cgroening/rs-sparcli"
 readme = "README.md"
 keywords = ["cli", "terminal", "prompt", "color", "ansi"]
 categories = ["command-line-interface"]
-exclude = ["/images"]
+exclude = ["/images", "/CLAUDE.md", "/docs", "/CLEAN-UP.md"]
 
 # Build docs.rs with every feature so markup/fuzzy/pager items are documented.
 [package.metadata.docs.rs]

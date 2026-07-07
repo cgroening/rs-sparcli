@@ -96,9 +96,9 @@ fn main() -> sparcli::Result<()> {
 }
 ```
 
-Prompts return `Outcome<T>` (either `Submitted(value)` or `Cancelled`) and never
-panic. They require an interactive terminal; without one they return
-`SparcliError::NoTerminal`.
+Prompts return `Outcome<T>` (`Submitted(value)`, `Cancelled`, or a fired
+`Shortcut(id)`) and never panic. They require an interactive terminal; without
+one they return `SparcliError::NoTerminal`.
 
 ## Theming
 
@@ -127,9 +127,9 @@ cargo run --example prompt-readme                     # non-interactive prompts
 
 ## Documentation
 
-- [`API.md`](API.md) – the complete public API in one place.
-- [`DEVELOPMENT.md`](DEVELOPMENT.md) – building, testing and contributing.
-- [`CHANGELOG.md`](CHANGELOG.md) – release notes.
+- [`API.md`](https://github.com/cgroening/rs-sparcli/blob/main/API.md) – the complete public API in one place.
+- [`DEVELOPMENT.md`](https://github.com/cgroening/rs-sparcli/blob/main/DEVELOPMENT.md) – building, testing and contributing.
+- [`CHANGELOG.md`](https://github.com/cgroening/rs-sparcli/blob/main/CHANGELOG.md) – release notes.
 - `cargo doc --all-features --open` – the canonical rustdoc reference.
 
 ## License

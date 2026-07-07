@@ -5,11 +5,10 @@ How to build, test and work on `sparcli`. Coding conventions live in
 
 ## Prerequisites
 
-- Rust (edition 2024; toolchain 1.85+).
+- Rust (edition 2024; toolchain 1.88+, required for let-chains).
 - No system dependencies beyond a terminal.
 
-Build artifacts go to `target.nosync/` (configured in `.cargo/config.toml` so
-iCloud does not sync them).
+Build artifacts go to `target/` (gitignored).
 
 ## Build
 
@@ -95,9 +94,14 @@ src/
   output/   Printable widgets implementing `Renderable`.
   input/    Interactive prompts over an `EventSource`, plus the shared
             line editor, terminal guard and prompt driver.
-examples/   Runnable demos (output_gallery, prompts).
+examples/   Runnable demos (output_gallery, output_dynamic, prompts,
+            output-readme, prompt-readme).
 tests/      End-to-end tests over the public API.
 ```
+
+The `core`/`input`/`output` module tree is `pub(crate)`; the public API is the
+curated set re-exported at the crate root plus the facade modules
+`sparcli::{markup, validate, event, shortcut, width, terminal}` and `prelude`.
 
 Dependency direction is one-way: `output` and `input` depend on `core`, never
 the reverse. `sparcli` never depends on `ratatui`.
@@ -108,12 +112,25 @@ the reverse. `sparcli` never depends on `ratatui`.
 - `CLICOLOR_FORCE=1` – force color even when output is not a terminal.
 - `SPARCLI_NO_TTY=1` – force "no terminal" behavior (used in tests).
 
+## Logging
+
+`sparcli` uses the [`log`](https://crates.io/crates/log) facade only, and only
+for `warn!`/`debug!` at spots where a `Result` would otherwise be silently
+swallowed (terminal restore in `TerminalGuard`, input-history save/load,
+temp-file cleanup, editor raw-mode toggles). Real errors are returned via
+`SparcliError` and are not logged (no double-logging), there are no `error!`
+calls, and no logger/backend is bundled – the consuming application installs one
+if it wants the output. Keep logging out of hot paths and render loops. See
+`CLAUDE.md` for the full convention.
+
 ## Adding a widget
 
 1. Add the module under `src/output/` or `src/input/`.
 2. Implement `Renderable` (output) or a `run`/`run_with` pair (input) using the
    shared `prompt::run_prompt` driver.
 3. Add unit tests in a `#[cfg(test)] mod tests` block.
-4. Re-export the public type in `src/lib.rs` (and `prelude` if commonly used).
+4. Re-export the public type at the crate root in `src/lib.rs` (and `prelude` if
+   commonly used); free-function utilities go into the relevant facade module,
+   not the `pub(crate)` module tree.
 5. Run `cargo test`, `cargo clippy -- -D warnings`, `cargo fmt`.
-6. Update `README.md` and, if relevant, the example gallery.
+6. Update `README.md`, `API.md` and, if relevant, the example gallery.

@@ -17,7 +17,7 @@
 //! [`Text`]: crate::Text
 //! [`Renderable`]: crate::Renderable
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 pub(crate) mod core;
 pub(crate) mod error;
