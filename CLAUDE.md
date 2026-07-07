@@ -14,7 +14,7 @@ CLI-Tools. Kein async, kein ratatui, minimaler Footprint.
 - **API-Gefühl:** ratatui-vertrautes Vokabular (`Style`, `Color`, `Span`,
   `Line`, `Text`, `Modifier`), fluentes Builder-API **und** Options-Struct.
 - **Scope:** Output komplett; Input nur Einzel-Widgets (kein Form/App/Args/
-  Serde/Logging). Fuzzy nur als inline Select.
+  Serde). Fuzzy nur als inline Select.
 
 ## Architektur (Schichten strikt trennen, §2.6/§7.2)
 
@@ -28,10 +28,15 @@ CLI-Tools. Kein async, kein ratatui, minimaler Footprint.
 
 ## Dependencies & Feature-Flags
 
-- Default (immer): `crossterm`, `unicode-width`, `thiserror`.
+- Default (immer): `crossterm`, `unicode-width`, `thiserror`, `log`.
 - Opt-in: `markup`, `fuzzy` (`nucleo-matcher`), `pager`.
 - Neue Dependencies **vorher mit dem Nutzer abstimmen** (§7.7).
 - Etablierte Crates mit `// https://crates.io/crates/<name>` über dem `use`.
+- **Logging:** nur die `log`-Facade und nur als `warn!`/`debug!` an Stellen, wo
+  ein `Result` sonst still verschluckt würde (z. B. Terminal-Restore im
+  `TerminalGuard`, History-Save/Load, Temp-Cleanup). Keine `error!`-Logs – echte
+  Fehler kommen über `SparcliError` zurück (kein Doppel-Logging); kein Logger/
+  Backend mitliefern (entscheidet die App); nichts in Hot Paths/Render-Schleifen.
 
 ## Fehlerbehandlung (§7.3) – sehr wichtig, robust & langlebig
 

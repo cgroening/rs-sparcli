@@ -46,7 +46,9 @@ pub(crate) fn edit_text(
     fs::write(&path, initial)?;
     let result = edit_file(command, &path);
     let contents = fs::read_to_string(&path);
-    let _ = fs::remove_file(&path);
+    if let Err(error) = fs::remove_file(&path) {
+        log::debug!("could not remove temp file {}: {error}", path.display());
+    }
     result?;
     Ok(contents?)
 }

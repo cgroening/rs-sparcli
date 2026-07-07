@@ -226,7 +226,9 @@ impl TextInput {
             return (None, self.history.clone());
         };
         let mut store = History::for_app(app);
-        let _ = store.load();
+        if let Err(error) = store.load() {
+            log::debug!("could not load input history: {error}");
+        }
         let entries = store.entries().to_vec();
         (Some(store), entries)
     }

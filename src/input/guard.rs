@@ -31,11 +31,16 @@ impl TerminalGuard {
 
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
-        // Best-effort restore: errors during cleanup are intentionally
-        // ignored so dropping never panics.
-        if self.bracketed_paste {
-            let _ = execute!(std::io::stdout(), DisableBracketedPaste);
+        // Best-effort restore that never panics: cleanup errors are logged
+        // and otherwise ignored so dropping stays infallible.
+        if self.bracketed_paste
+            && let Err(error) =
+                execute!(std::io::stdout(), DisableBracketedPaste)
+        {
+            log::warn!("could not disable bracketed paste: {error}");
         }
-        let _ = disable_raw_mode();
+        if let Err(error) = disable_raw_mode() {
+            log::warn!("could not restore terminal from raw mode: {error}");
+        }
     }
 }

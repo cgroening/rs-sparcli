@@ -121,13 +121,15 @@ impl TextInput {
     fn launch_editor(&self, state: &mut State) -> Flow<String> {
         let was_raw =
             crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
-        if was_raw {
-            let _ = crossterm::terminal::disable_raw_mode();
+        if was_raw && let Err(error) = crossterm::terminal::disable_raw_mode() {
+            log::debug!("could not leave raw mode for the editor: {error}");
         }
         let command = self.editor_command.as_deref();
         let result = editor::edit_text(command, &state.editor.value(), ".txt");
-        if was_raw {
-            let _ = crossterm::terminal::enable_raw_mode();
+        if was_raw && let Err(error) = crossterm::terminal::enable_raw_mode() {
+            log::debug!(
+                "could not re-enter raw mode after the editor: {error}"
+            );
         }
         if let Ok(text) = result {
             let single_line = text.replace('\n', " ");
@@ -148,7 +150,9 @@ impl TextInput {
         }
         if let Some(store) = &mut state.store {
             store.add(&value);
-            let _ = store.save();
+            if let Err(error) = store.save() {
+                log::warn!("could not save input history: {error}");
+            }
         }
         Flow::Submit(value)
     }
