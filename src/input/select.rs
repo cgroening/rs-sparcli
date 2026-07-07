@@ -26,6 +26,21 @@ struct State {
 }
 
 /// A scrollable selection list (single or multi).
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{Outcome, Select};
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(index) =
+///     Select::new("Pick one").options(["red", "green", "blue"]).run()?
+/// {
+///     println!("chose option {index}");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct Select {
     prompt: String,
     options: Vec<String>,

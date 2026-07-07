@@ -37,6 +37,22 @@ enum MatchMode {
 }
 
 /// A single-line text input prompt.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{Outcome, TextInput};
+/// use sparcli::validate::non_empty;
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(name) =
+///     TextInput::new("Your name?").validate(non_empty()).run()?
+/// {
+///     println!("Hello, {name}!");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct TextInput {
     prompt: String,
     initial: String,

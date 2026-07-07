@@ -52,6 +52,15 @@ pub struct Thresholds {
 }
 
 /// A configurable progress bar.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::ProgressBar;
+///
+/// let bar = ProgressBar::new().width(20).bar(0.5, 1.0);
+/// assert!(bar.plain().contains("50%"));
+/// ```
 pub struct ProgressBar {
     style: ProgressStyle,
     left_cap: String,

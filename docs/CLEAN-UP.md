@@ -28,7 +28,7 @@ Durchgeführte Änderungen:
 - Stale `#[allow(dead_code)]` in `input/event.rs` entfernt (wird von Tests genutzt).
 - `API.md` und `CHANGELOG.md` synchronisiert (eval-Entfernung).
 
-Bewusste Nicht-Änderungen (KISS, „im Zweifel lassen"):
+Bewusste Nicht-Änderungen (KISS, "im Zweifel lassen"):
 - `panel` (326), `list` (309), `select` (402), `fuzzy` (385): je eine kohärente
   Verantwortung knapp über der ~300-Signalgrenze – kein Klarheitsgewinn durch
   weiteres Splitten.
@@ -234,10 +234,10 @@ gezielt anpassen.
 
 - **Scope-Grenzen (CLAUDE.md):** Output komplett, Input nur Einzel-Widgets –
   kein Form/App/Args/Serde/Logging, Fuzzy nur als inline Select. Nichts davon
-  im Aufräumen „nachrüsten“.
+  im Aufräumen "nachrüsten".
 - **Kein async, kein ratatui:** schlanker Footprint ist Leitbild – keine neuen
   Dependencies ohne vorherige Abstimmung (CLAUDE.md §7.7).
 - **Einheitliches Theme:** `core/theme.rs` gilt für Input UND Output – nicht
   aufspalten.
-- KISS/YAGNI vor „mein Stil“: lokalen Stil respektieren, nur anfassen was die
+- KISS/YAGNI vor "mein Stil": lokalen Stil respektieren, nur anfassen was die
   Aufgabe erfordert, Refactoring von Verhalten trennen (CLAUDE.md §3).

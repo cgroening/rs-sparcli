@@ -1,5 +1,10 @@
 # sparcli
 
+[![Crates.io](https://img.shields.io/crates/v/sparcli.svg)](https://crates.io/crates/sparcli)
+[![Docs.rs](https://docs.rs/sparcli/badge.svg)](https://docs.rs/sparcli)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://www.rust-lang.org)
+
 A lightweight, cross-platform toolkit for **styled CLI output** and
 **interactive input widgets** in Rust. It renders directly to the terminal via
 [`crossterm`](https://crates.io/crates/crossterm) (no `ratatui` dependency) but
@@ -30,10 +35,12 @@ full-screen/retained TUIs are out of scope (that is what ratatui is for).
 
 ```toml
 [dependencies]
-sparcli = "0.1"
+sparcli = "0.2"
 # Opt-in features (the base stays small):
-# sparcli = { version = "0.1", features = ["markup", "fuzzy", "pager"] }
+# sparcli = { version = "0.2", features = ["markup", "fuzzy", "pager"] }
 ```
+
+MSRV: Rust 1.88 (edition 2024).
 
 | Feature  | Adds                                              |
 | -------- | ------------------------------------------------- |
@@ -127,10 +134,10 @@ cargo run --example prompt-readme                     # non-interactive prompts
 
 ## Documentation
 
-- [`API.md`](https://github.com/cgroening/rs-sparcli/blob/main/API.md) – the complete public API in one place.
-- [`DEVELOPMENT.md`](https://github.com/cgroening/rs-sparcli/blob/main/DEVELOPMENT.md) – building, testing and contributing.
+- [docs.rs/sparcli](https://docs.rs/sparcli) – the complete API reference (rustdoc, built with all features).
+- [`DEVELOPMENT.md`](https://github.com/cgroening/rs-sparcli/blob/main/docs/DEVELOPMENT.md) – building, testing and contributing.
 - [`CHANGELOG.md`](https://github.com/cgroening/rs-sparcli/blob/main/CHANGELOG.md) – release notes.
-- `cargo doc --all-features --open` – the canonical rustdoc reference.
+- `cargo doc --all-features --open` – build the same reference locally.
 
 ## License
 

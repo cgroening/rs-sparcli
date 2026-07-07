@@ -44,6 +44,15 @@ impl Default for BoxOpts {
 }
 
 /// A bordered panel around rich content.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Panel, Renderable, Title};
+///
+/// let out = Panel::new("Ready.").title(Title::new("Status")).render(40);
+/// assert!(out.plain().contains("Ready."));
+/// ```
 pub struct Panel {
     content: Rendered,
     opts: BoxOpts,

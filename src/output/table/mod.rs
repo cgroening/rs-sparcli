@@ -153,6 +153,18 @@ struct Row {
 }
 
 /// A data table.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Renderable, Table};
+///
+/// let out = Table::new()
+///     .columns(["Name", "Status"])
+///     .row(["web-1", "online"])
+///     .render(40);
+/// assert!(out.plain().contains("web-1"));
+/// ```
 pub struct Table {
     columns: Vec<Column>,
     rows: Vec<Row>,

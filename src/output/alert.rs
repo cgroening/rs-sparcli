@@ -52,6 +52,15 @@ impl AlertKind {
 }
 
 /// A bordered, pre-styled status message.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Alert, Renderable};
+///
+/// let out = Alert::success("Build finished.").render(80);
+/// assert!(out.plain().contains("Build finished."));
+/// ```
 pub struct Alert {
     kind: AlertKind,
     content: Text,

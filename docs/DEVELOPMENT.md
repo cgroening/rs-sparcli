@@ -1,7 +1,7 @@
 # Development
 
 How to build, test and work on `sparcli`. Coding conventions live in
-[`CLAUDE.md`](CLAUDE.md).
+[`CLAUDE.md`](../CLAUDE.md).
 
 ## Prerequisites
 
@@ -133,4 +133,5 @@ if it wants the output. Keep logging out of hot paths and render loops. See
    commonly used); free-function utilities go into the relevant facade module,
    not the `pub(crate)` module tree.
 5. Run `cargo test`, `cargo clippy -- -D warnings`, `cargo fmt`.
-6. Update `README.md`, `API.md` and, if relevant, the example gallery.
+6. Add rustdoc (with a `# Examples` doctest where the usage is not obvious) and
+   update `README.md` and, if relevant, the example gallery.

@@ -5,7 +5,7 @@ contributions should keep it lightweight and cross-platform.
 
 ## Getting started
 
-See [`DEVELOPMENT.md`](DEVELOPMENT.md) for building, running the examples,
+See [`DEVELOPMENT.md`](docs/DEVELOPMENT.md) for building, running the examples,
 testing, linting and the project layout. The full coding conventions live in
 [`CLAUDE.md`](CLAUDE.md); please skim it before a larger change.
 
@@ -24,7 +24,7 @@ For anything beyond a small fix, please open an issue first to discuss it.
 - New behavior has tests; output widgets render to a buffer, input widgets are
   driven by the scripted fake event source (headless, no TTY needed).
 - Documentation is updated where relevant: rustdoc on public items, plus
-  `README.md` / `API.md` / `CHANGELOG.md`.
+  `README.md` / `CHANGELOG.md`.
 
 ## Commit messages
 

@@ -7,10 +7,12 @@ authors = ["Corvin Gröning"]
 description = "Lightweight, cross-platform toolkit for styled CLI output and interactive input widgets"
 license = "MIT"
 repository = "https://github.com/cgroening/rs-sparcli"
+homepage = "https://github.com/cgroening/rs-sparcli"
+documentation = "https://docs.rs/sparcli"
 readme = "README.md"
 keywords = ["cli", "terminal", "prompt", "color", "ansi"]
-categories = ["command-line-interface"]
-exclude = ["/images", "/CLAUDE.md", "/docs", "/CLEAN-UP.md"]
+categories = ["command-line-interface", "value-formatting"]
+exclude = ["/images", "/CLAUDE.md", "/docs"]
 
 # Build docs.rs with every feature so markup/fuzzy/pager items are documented.
 [package.metadata.docs.rs]
