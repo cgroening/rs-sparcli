@@ -83,6 +83,9 @@ impl Edges {
 }
 
 /// A framed title, e.g. on a panel, rule or table.
+///
+/// When inset into a border, a left-aligned title reads as part of the frame
+/// with one connecting glyph before it (`┌─ Title ─`), not a flush `┌ Title`.
 #[derive(Debug, Clone, Default)]
 pub struct Title {
     /// The title content (rich text).

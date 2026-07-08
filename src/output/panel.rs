@@ -263,7 +263,10 @@ fn horizontal_fill(glyph: char, width: usize, opts: &BoxOpts) -> Span {
     Span::styled(glyph.to_string().repeat(width), opts.border_style)
 }
 
-/// Embeds a title within a horizontal border run.
+/// Embeds a title within a horizontal border run so it reads as part of the
+/// frame. A left-aligned title keeps exactly one connecting border glyph before
+/// it (`┌─ Title ─`), never a flush `┌ Title`; the glyphs on both sides take the
+/// border style so the seam stays uniform.
 fn push_titled_fill(
     spans: &mut Vec<Span>,
     title: &Title,
@@ -321,6 +324,18 @@ mod tests {
             .title(Title::new("Info"));
         let lines = plain(&panel.render(40));
         assert!(lines[0].contains("Info"));
+    }
+
+    #[test]
+    fn left_title_reads_as_part_of_the_border() {
+        // A left-aligned title keeps one connecting glyph between the corner
+        // and the title, so the top border reads `┌─ Info ─` rather than a
+        // flush `┌ Info ─`.
+        let panel = Panel::new("body")
+            .border(BorderType::Single)
+            .title(Title::new("Info"));
+        let lines = plain(&panel.render(40));
+        assert!(lines[0].starts_with("\u{250c}\u{2500} Info "));
     }
 
     #[test]

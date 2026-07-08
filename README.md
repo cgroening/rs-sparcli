@@ -85,6 +85,26 @@ Every output widget implements `Renderable`: call `.print()` to write to stdout,
 or `.print_to(&mut writer)` to capture output. When stdout is not a terminal (a
 pipe, a file, or with `NO_COLOR`), no escape codes are emitted.
 
+Widgets like `Panel` frame their content with a rounded border and an optional
+title:
+
+```rust
+use sparcli::{Panel, Renderable, Title};
+
+Panel::new("All systems nominal.")
+    .title(Title::new("Status"))
+    .print()?;
+```
+
+```text
+╭─ Status ─────────────╮
+│ All systems nominal. │
+╰──────────────────────╯
+```
+
+A left-aligned title reads as part of the frame: one connecting border glyph
+sits before it (`╭─ Status ─`), never a flush `╭ Status`.
+
 ## Input example
 
 ```rust
