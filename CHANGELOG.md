@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-10
+
+### Added
+
+- `Spinner::clear` stops a spinner and erases its line, for a transient spinner whose outcome is reported elsewhere. Mirrors `Live::clear`.
+
+### Changed
+
+- `Table` now honours the render width: a table that already fits is unchanged, while an overflowing one shrinks its flexible columns (wrapping columns reflow first, then the rest truncate) so its borders stay within the terminal. `fixed_width` columns never shrink and no column falls below its `min_width`.
+
 ## [0.2.0] - 2026-07-07
 
 ### Added

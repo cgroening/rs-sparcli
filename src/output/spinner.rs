@@ -99,6 +99,21 @@ impl Spinner {
         Ok(())
     }
 
+    /// Stops the spinner and erases its line, leaving nothing behind.
+    ///
+    /// Use this for a transient spinner whose outcome is reported elsewhere, so
+    /// no marker line lingers above it. Mirrors [`crate::Live::clear`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::SparcliError::Io`] if writing fails.
+    pub fn clear(mut self) -> Result<()> {
+        match self.inplace.take() {
+            Some(inplace) => inplace.clear(),
+            None => Ok(()),
+        }
+    }
+
     /// Stops the spinner with a success or failure marker.
     ///
     /// # Errors
@@ -162,5 +177,11 @@ mod tests {
     fn pipe_style_uses_ascii_frames() {
         let spinner = Spinner::new("").style(SpinnerStyle::Pipe);
         assert_eq!(spinner.frame().lines[0].plain(), "|");
+    }
+
+    #[test]
+    fn clearing_an_untouched_spinner_is_harmless() {
+        // Never ticked, so nothing was drawn and clearing writes nothing.
+        assert!(Spinner::new("loading").clear().is_ok());
     }
 }
