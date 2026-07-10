@@ -71,7 +71,15 @@ pub(super) fn build_plan(rows: &[Row], cols: usize) -> Vec<RowPlan<'_>> {
 }
 
 /// Computes the display width of each column from the placement plan.
-pub(super) fn column_widths(table: &Table, plan: &[RowPlan]) -> Vec<usize> {
+///
+/// The result never exceeds `max_width`: a table that already fits is returned
+/// unchanged, while an overflowing one has its flexible columns shrunk (see
+/// [`fit_to_width`]).
+pub(super) fn column_widths(
+    table: &Table,
+    plan: &[RowPlan],
+    max_width: usize,
+) -> Vec<usize> {
     let mut widths = vec![0usize; table.columns.len()];
     for (index, column) in table.columns.iter().enumerate() {
         if table.header {
@@ -91,6 +99,7 @@ pub(super) fn column_widths(table: &Table, plan: &[RowPlan]) -> Vec<usize> {
     for (index, column) in table.columns.iter().enumerate() {
         widths[index] = clamp_width(widths[index], column);
     }
+    fit_to_width(table, &mut widths, max_width);
     widths
 }
 
@@ -104,4 +113,90 @@ fn clamp_width(natural: usize, column: &Column) -> usize {
         width = width.min(max);
     }
     width.max(1)
+}
+
+/// Which columns a shrink pass may take width from.
+#[derive(Clone, Copy)]
+enum ShrinkPass {
+    /// Columns marked `wrap`, which reflow onto more lines without losing text.
+    Wrapping,
+    /// The remaining flexible columns, which truncate their content.
+    NonWrapping,
+}
+
+/// Shrinks flexible columns until the table fits `max_width`.
+///
+/// A table that already fits is left untouched, so its layout is identical to
+/// the pre-fitting behaviour. When it overflows, wrapping columns give up width
+/// first (they only reflow), then the rest (they truncate). `fixed_width`
+/// columns never shrink, and no column falls below its `min_width` floor, so a
+/// table too narrow even at the floors overflows rather than turn unreadable.
+fn fit_to_width(table: &Table, widths: &mut [usize], max_width: usize) {
+    let pad = table.pad as usize;
+    let cells = widths.len();
+    let overhead = cells * (2 * pad + 1) + 1;
+    let budget = max_width.saturating_sub(overhead);
+    let content: usize = widths.iter().sum();
+    if content <= budget {
+        return;
+    }
+    let mut deficit = content - budget;
+    deficit = shrink(table, widths, deficit, ShrinkPass::Wrapping);
+    shrink(table, widths, deficit, ShrinkPass::NonWrapping);
+}
+
+/// Takes one cell at a time from the widest eligible column, returning the
+/// width still to be recovered once no eligible column has slack left.
+fn shrink(
+    table: &Table,
+    widths: &mut [usize],
+    mut deficit: usize,
+    pass: ShrinkPass,
+) -> usize {
+    while deficit > 0 {
+        let Some(index) = widest_shrinkable(table, widths, pass) else {
+            break;
+        };
+        widths[index] -= 1;
+        deficit -= 1;
+    }
+    deficit
+}
+
+/// The eligible column with the most slack above its floor, ties to the lowest
+/// index so the outcome is deterministic.
+fn widest_shrinkable(
+    table: &Table,
+    widths: &[usize],
+    pass: ShrinkPass,
+) -> Option<usize> {
+    let mut best: Option<(usize, usize)> = None;
+    for (index, &width) in widths.iter().enumerate() {
+        let column = &table.columns[index];
+        if !eligible(column, pass) || width <= floor(column) {
+            continue;
+        }
+        // Replace only on a strictly wider column, so equal widths keep the
+        // earlier index.
+        if best.is_none_or(|(_, best_width)| width > best_width) {
+            best = Some((index, width));
+        }
+    }
+    best.map(|(index, _)| index)
+}
+
+/// Whether `column` may give up width during `pass`.
+fn eligible(column: &Column, pass: ShrinkPass) -> bool {
+    if column.fixed_width.is_some() {
+        return false;
+    }
+    match pass {
+        ShrinkPass::Wrapping => column.wrap,
+        ShrinkPass::NonWrapping => !column.wrap,
+    }
+}
+
+/// The narrowest a column may be shrunk to, mirroring [`clamp_width`].
+fn floor(column: &Column) -> usize {
+    column.min_width.max(1)
 }
