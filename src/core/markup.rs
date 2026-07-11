@@ -107,20 +107,31 @@ impl Parser {
             self.buffer.push_str(&tag);
             return;
         }
-        self.apply_tag(tag.trim());
+        self.apply_tag(&tag);
     }
 
-    /// Applies an open or close tag to the style stack.
-    fn apply_tag(&mut self, tag: &str) {
-        self.flush_span();
+    /// Applies an open or close tag, or emits an unrecognized bracket literally.
+    fn apply_tag(&mut self, raw: &str) {
+        let tag = raw.trim();
         if tag == "/" {
+            self.flush_span();
             if self.stack.len() > 1 {
                 self.stack.pop();
             }
             return;
         }
+        let specs = parse_specs(tag);
+        if specs == Style::new() {
+            // A closed bracket that names no known style or attribute (e.g.
+            // "array[0]") is content, not markup, so emit it literally.
+            self.buffer.push('[');
+            self.buffer.push_str(raw);
+            self.buffer.push(']');
+            return;
+        }
+        self.flush_span();
         let current = self.current_style();
-        self.stack.push(current.patch(parse_specs(tag)));
+        self.stack.push(current.patch(specs));
     }
 
     /// Toggles a code span on or off using the code style.
@@ -256,6 +267,20 @@ mod tests {
     fn unterminated_bracket_is_literal() {
         let text = parse("a [b c");
         assert_eq!(text.lines[0].plain(), "a [b c");
+    }
+
+    #[test]
+    fn closed_unknown_tag_is_literal() {
+        // A closed bracket naming no style/attribute is content, not markup.
+        assert_eq!(parse("array[0]").lines[0].plain(), "array[0]");
+        assert_eq!(parse("[hello world]").lines[0].plain(), "[hello world]");
+    }
+
+    #[test]
+    fn recognized_tag_still_applies_alongside_literal_bracket() {
+        let text = parse("[red]x[/] array[0]");
+        assert_eq!(text.lines[0].plain(), "x array[0]");
+        assert_eq!(text.lines[0].spans[0].style.fg, Some(Color::Red));
     }
 
     #[test]

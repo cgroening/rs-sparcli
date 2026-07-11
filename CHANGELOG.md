@@ -7,11 +7,18 @@ All notable changes to this project are documented here. The format is based on 
 ### Added
 
 - The terminal hardware cursor is now hidden during in-place redraws (spinner, progress, multi-progress, live) and interactive prompts, and restored on finish, on prompt exit, on drop and on panic. Mirrors the Python port.
+- `Style::remove_modifier` clears one or more attributes from a style (the counterpart to `add_modifier`). Mirrors the Python port.
 
 ### Changed
 
 - `Panel` and `Alert` now honour the render width: a fixed width is capped to the terminal, overflowing natural content shrinks the frame, and a title too wide for the interior is truncated (`…`) instead of widening the box.
 - Inline markup matches attribute names and the `on` background keyword case-insensitively (`[BOLD]`, `[white ON blue]`), and a tag opened inside a backtick code span no longer defeats the closing backtick.
+- Inline markup no longer swallows a closed bracket that names no known style or attribute (such as `array[0]`); such text is emitted literally. Mirrors the Python port.
+
+### Fixed
+
+- Control characters (C0, DEL and C1, except tab) are stripped from span content and OSC-8 link URLs before they reach the terminal, so untrusted text can no longer inject escape sequences or terminate a hyperlink early. Mirrors the Python port.
+- History files are written atomically (temp file plus rename), so a crash or a concurrent writer can no longer truncate the file. Mirrors the Python port.
 - `truncate` never exceeds `max_cols`: a width of `0` yields an empty string, and an ellipsis wider than `max_cols` is clamped to fit.
 - `strip_ansi` recognises the full CSI final-byte range (`0x40..=0x7e`), so escape sequences ending in a non-letter byte are stripped correctly.
 - `COLORTERM` is matched case-insensitively when detecting truecolor support.

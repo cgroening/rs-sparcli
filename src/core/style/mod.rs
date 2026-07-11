@@ -95,6 +95,13 @@ impl Style {
         self
     }
 
+    /// Clears one or more attributes from the style.
+    #[must_use]
+    pub fn remove_modifier(mut self, attr: Attribute) -> Self {
+        self.attrs = Attribute(self.attrs.0 & !attr.0);
+        self
+    }
+
     /// Adds the bold attribute.
     #[must_use]
     pub fn bold(self) -> Self {
@@ -166,5 +173,15 @@ mod tests {
         assert_eq!(patched.bg, Some(Color::Blue));
         assert!(patched.attrs.contains(Attribute::BOLD));
         assert!(patched.attrs.contains(Attribute::ITALIC));
+    }
+
+    #[test]
+    fn remove_modifier_clears_only_the_named_attribute() {
+        let style = Style::new()
+            .bold()
+            .italic()
+            .remove_modifier(Attribute::BOLD);
+        assert!(!style.attrs.contains(Attribute::BOLD));
+        assert!(style.attrs.contains(Attribute::ITALIC));
     }
 }
