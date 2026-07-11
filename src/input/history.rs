@@ -120,7 +120,14 @@ impl History {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(path, self.entries.join("\n"))?;
+        // Write to a sibling temp file and rename it over the target so a
+        // crash or a concurrent writer never leaves a half-written file.
+        let temp = path.with_extension(format!("tmp.{}", std::process::id()));
+        fs::write(&temp, self.entries.join("\n"))?;
+        if let Err(error) = fs::rename(&temp, path) {
+            let _ = fs::remove_file(&temp);
+            return Err(error.into());
+        }
         Ok(())
     }
 }
@@ -161,5 +168,24 @@ mod tests {
         history.add("b");
         history.add("c");
         assert_eq!(history.entries(), &["b", "c"]);
+    }
+
+    #[test]
+    fn save_is_atomic_and_leaves_no_temp_files() {
+        let dir = std::env::temp_dir()
+            .join(format!("sparcli_hist_test_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let mut history = History::new();
+        history.path = Some(dir.join("history"));
+        history.add("one");
+        history.save().unwrap();
+
+        let names: Vec<String> = fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(names, vec!["history".to_string()]);
+        assert_eq!(fs::read_to_string(dir.join("history")).unwrap(), "one");
+        fs::remove_dir_all(&dir).unwrap();
     }
 }

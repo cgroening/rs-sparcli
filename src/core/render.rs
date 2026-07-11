@@ -145,7 +145,7 @@ fn write_span<W: Write>(
     // No-color terminals (and NO_COLOR / pipes) get plain text only, without
     // even OSC-8 hyperlink escapes.
     if support == ColorSupport::None {
-        queue!(writer, Print(&span.content))?;
+        queue!(writer, Print(sanitize(&span.content)))?;
         return Ok(());
     }
     let colored = apply_colors(writer, span, support)?;
@@ -198,16 +198,28 @@ fn apply_attributes<W: Write>(
 }
 
 /// Writes the span text, wrapping it in OSC-8 codes when a link is present.
+///
+/// The content and the URL are scrubbed of control characters so untrusted
+/// text cannot inject escape sequences or terminate the OSC-8 sequence early.
 fn write_content<W: Write>(writer: &mut W, span: &Span) -> io::Result<()> {
+    let content = sanitize(&span.content);
     match &span.link {
-        None => queue!(writer, Print(&span.content))?,
+        None => queue!(writer, Print(content))?,
         Some(url) => {
-            queue!(writer, Print(format!("\x1b]8;;{url}\x1b\\")))?;
-            queue!(writer, Print(&span.content))?;
+            let safe = sanitize(url);
+            queue!(writer, Print(format!("\x1b]8;;{safe}\x1b\\")))?;
+            queue!(writer, Print(content))?;
             queue!(writer, Print("\x1b]8;;\x1b\\"))?;
         }
     }
     Ok(())
+}
+
+/// Strips control characters (except tab) that would corrupt terminal output.
+fn sanitize(text: &str) -> String {
+    text.chars()
+        .filter(|&c| c == '\t' || !c.is_control())
+        .collect()
 }
 
 #[cfg(test)]
@@ -258,5 +270,34 @@ mod tests {
         let rendered = Rendered::new(vec![line]);
         let output = render_to_string(&rendered, ColorSupport::None);
         assert_eq!(output, "x\n");
+    }
+
+    #[test]
+    fn control_chars_are_stripped_from_content() {
+        // A raw ESC / BEL / CR must not reach the terminal; an unstyled span
+        // emits no escapes, so the injected SGR is left as inert text.
+        let line = Line::new(vec![Span::raw("a\x1b[31mb\x07\rc")]);
+        let rendered = Rendered::new(vec![line]);
+        let output = render_to_string(&rendered, ColorSupport::TrueColor);
+        assert!(!output.contains('\u{1b}'));
+        assert!(!output.contains('\u{7}'));
+        assert!(!output.contains('\r'));
+        assert_eq!(output, "a[31mbc\n");
+    }
+
+    #[test]
+    fn tab_survives_sanitization() {
+        let rendered = Rendered::new(vec![Line::raw("a\tb")]);
+        let output = render_to_string(&rendered, ColorSupport::None);
+        assert_eq!(output, "a\tb\n");
+    }
+
+    #[test]
+    fn link_injection_is_neutralized() {
+        let line =
+            Line::new(vec![Span::raw("x").link("http://e\x1b\\\x1b]8;;evil")]);
+        let rendered = Rendered::new(vec![line]);
+        let output = render_to_string(&rendered, ColorSupport::Ansi16);
+        assert!(!output.contains("\x1b\\\x1b]8;;evil"));
     }
 }
