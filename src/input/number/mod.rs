@@ -22,6 +22,21 @@ struct State {
 }
 
 /// A numeric input prompt with optional calculator expressions.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{NumberInput, Outcome};
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(count) =
+///     NumberInput::new("How many?").range(0.0, 100.0).run()?
+/// {
+///     println!("count = {count}");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct NumberInput {
     prompt: String,
     initial: f64,

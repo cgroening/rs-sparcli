@@ -1,42 +1,26 @@
 # CLAUDE.md – sparcli (Rust)
 
-Requirements for all future sessions in this project. In case of conflict, this
-file takes precedence over conventions, but not over explicit user instructions.
+Requirements for all future sessions in this project. In case of conflict, this file takes precedence over conventions, but not over explicit user instructions.
 
 ## What is this?
 
-`sparcli` is a **lightweight, platform-independent** toolkit (macOS, Windows,
-Linux) for **styled CLI output** and **interactive single-input widgets** –
-a native Rust port of the C library `sparcli`. Guiding principle: lean, for
-small CLI tools. No async, no ratatui, minimal footprint.
+`sparcli` is a **lightweight, platform-independent** toolkit (macOS, Windows, Linux) for **styled CLI output** and **interactive single-input widgets** – a native Rust port of the C library `sparcli`. Guiding principle: lean, for small CLI tools. No async, no ratatui, minimal footprint.
 
 - **Foundation:** custom renderer on `crossterm` (no ratatui).
-- **API feel:** ratatui-familiar vocabulary (`Style`, `Color`, `Span`,
-  `Line`, `Text`, `Modifier`), fluent builder API **and** options struct.
-- **Scope:** output complete; input only single widgets (no Form/App/Args/
-  Serde). Fuzzy only as inline Select.
+- **API feel:** ratatui-familiar vocabulary (`Style`, `Color`, `Span`, `Line`, `Text`, `Modifier`), fluent builder API **and** options struct.
+- **Scope:** output complete; input only single widgets (no Form/App/Args/ Serde). Fuzzy only as inline Select.
 
 ## Python twin – keep in sync
 
-There is a parallel Python version of `sparcli` at
-`/Users/cgroening/Developer/Python/libs/sparcli`. On **every change** to this
-Rust crate, check whether the same change has to be applied to the Python
-version too (behavior, API, docs, tests) – and **ask the user** whether it
-should be ported before proceeding.
+There is a parallel Python version of `sparcli` at `/Users/cgroening/Developer/Python/libs/sparcli`. On **every change** to this Rust crate, check whether the same change has to be applied to the Python version too (behavior, API, docs, tests) – and **ask the user** whether it should be ported before proceeding.
 
-**Known intentional divergence:** `Date::today()` returns a **UTC** date here
-(dependency-free, no local-time API in `std`), while the Python port uses the
-**local** date. Near midnight the `DatePicker`'s default day can differ by one
-between the two ports. Do not "fix" this into parity by adding a time-zone
-dependency without user sign-off.
+**Known intentional divergence:** `Date::today()` returns a **UTC** date here (dependency-free, no local-time API in `std`), while the Python port uses the **local** date. Near midnight the `DatePicker`'s default day can differ by one between the two ports. Do not "fix" this into parity by adding a time-zone dependency without user sign-off.
 
 ## Architecture (separate layers strictly, §2.6/§7.2)
 
-- `core/` – foundation: style, text, markup, theme, border, geometry, width,
-  terminal, render. No widget logic.
+- `core/` – foundation: style, text, markup, theme, border, geometry, width, terminal, render. No widget logic.
 - `output/` – printable widgets, implement `Renderable`.
-- `input/` – interactive prompts via `EventSource` (DI) + `frame` redraw +
-  `line_edit` (SSOT for text input).
+- `input/` – interactive prompts via `EventSource` (DI) + `frame` redraw + `line_edit` (SSOT for text input).
 - Dependency direction: `output`/`input` → `core`. Never cyclic.
 - **Unified theme** in `core/theme.rs` applies to input AND output.
 
@@ -46,18 +30,12 @@ dependency without user sign-off.
 - Opt-in: `markup`, `fuzzy` (`nucleo-matcher`), `pager`.
 - New dependencies **must be agreed with the user beforehand** (§7.7).
 - Established crates with `// https://crates.io/crates/<name>` above the `use`.
-- **Logging:** only the `log` facade and only as `warn!`/`debug!` at places where
-  a `Result` would otherwise be silently swallowed (e.g. terminal restore in the
-  `TerminalGuard`, history save/load, temp cleanup). No `error!` logs – real
-  errors come back via `SparcliError` (no double logging); do not ship a logger/
-  backend (the app decides); nothing in hot paths/render loops.
+- **Logging:** only the `log` facade and only as `warn!`/`debug!` at places where a `Result` would otherwise be silently swallowed (e.g. terminal restore in the `TerminalGuard`, history save/load, temp cleanup). No `error!` logs – real errors come back via `SparcliError` (no double logging); do not ship a logger/ backend (the app decides); nothing in hot paths/render loops.
 
 ## Error Handling (§7.3) – very important, robust & long-lived
 
-- No `unwrap()`; `expect()` only at provably infallible places with a
-  justification. No `panic!` in normal operation.
-- Errors via `Result<T, E>` + `?`. Library errors as a `thiserror` enum
-  (`SparcliError`), foreign errors via `#[from]`.
+- No `unwrap()`; `expect()` only at provably infallible places with a justification. No `panic!` in normal operation.
+- Errors via `Result<T, E>` + `?`. Library errors as a `thiserror` enum (`SparcliError`), foreign errors via `#[from]`.
 - Input prompts return `Outcome<T>` (`Submitted` / `Cancelled`).
 - `TerminalGuard` (RAII) restores the terminal on drop/error/panic.
 - Defensive: safeguard inputs/edge cases, prefer to fail in a controlled way.
@@ -77,10 +55,8 @@ dependency without user sign-off.
 - Edition 2024. `cargo fmt` (rustfmt.toml: max_width 80).
 - `cargo clippy --all-targets -- -D warnings` must be clean.
 - 80-character code lines; straight quotes.
-- **No em dash** as a dash: in code files use the hyphen, in `.md` files use
-  the en dash `–`.
-- rustdoc on every public item, module `//!`; `# Examples`/`# Errors`/
-  `# Panics` where applicable; `#![warn(missing_docs)]`.
+- **No em dash** as a dash: in code files use the hyphen, in `.md` files use the en dash `–`.
+- rustdoc on every public item, module `//!`; `# Examples`/`# Errors`/ `# Panics` where applicable; `#![warn(missing_docs)]`.
 
 ## Appearance (§7.10)
 

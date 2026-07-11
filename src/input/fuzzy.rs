@@ -36,6 +36,21 @@ struct State {
 }
 
 /// An inline fuzzy-select prompt.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{FuzzySelect, Outcome};
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(index) =
+///     FuzzySelect::new("Find a fruit:").options(["apple", "banana"]).run()?
+/// {
+///     println!("chose option {index}");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct FuzzySelect {
     prompt: String,
     options: Vec<String>,

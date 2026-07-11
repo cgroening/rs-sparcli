@@ -27,6 +27,19 @@ struct State {
 }
 
 /// A month-grid date picker prompt.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{DatePicker, Outcome};
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(date) = DatePicker::new("Start date?").run()? {
+///     println!("selected {date:?}");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct DatePicker {
     prompt: String,
     initial: Date,

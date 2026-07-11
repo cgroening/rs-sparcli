@@ -10,6 +10,25 @@
 //! The base crate stays small; heavier features live behind cargo features
 //! (`markup`, `fuzzy`, `pager`).
 //!
+//! # Examples
+//!
+//! Build a styled panel and render it to a string (no terminal required),
+//! which is exactly how the output widgets are tested:
+//!
+//! ```
+//! use sparcli::{Color, Panel, Renderable, Style, Title};
+//!
+//! let panel = Panel::new("Build succeeded.")
+//!     .title(Title::new("Status"))
+//!     .border_style(Style::new().fg(Color::Green));
+//!
+//! let out = panel.render(40);
+//! assert!(out.plain().contains("Build succeeded."));
+//! ```
+//!
+//! In a real program you would print it straight to the terminal with
+//! `panel.print()?` instead of rendering to a string.
+//!
 //! [`Style`]: crate::Style
 //! [`Color`]: crate::Color
 //! [`Span`]: crate::Span

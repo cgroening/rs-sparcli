@@ -9,6 +9,15 @@ use crate::core::theme::theme;
 use crate::output::compose::pad;
 
 /// A horizontal divider line, optionally labelled with a title.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Renderable, Rule};
+///
+/// let out = Rule::with_title("Settings").render(30);
+/// assert!(out.plain().contains("Settings"));
+/// ```
 pub struct Rule {
     title: Option<Text>,
     border: BorderType,

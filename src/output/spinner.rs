@@ -36,6 +36,19 @@ impl SpinnerStyle {
 }
 
 /// An animated, single-line spinner with a label.
+///
+/// Call [`tick`](Self::tick) in a loop to animate it in place and
+/// [`finish`](Self::finish) when done; [`frame`](Self::frame) returns the
+/// current frame without touching the terminal.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Spinner, SpinnerStyle};
+///
+/// let spinner = Spinner::new("Loading").style(SpinnerStyle::Pipe);
+/// assert!(spinner.frame().plain().contains("Loading"));
+/// ```
 pub struct Spinner {
     style: SpinnerStyle,
     color: Color,

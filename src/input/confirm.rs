@@ -19,6 +19,21 @@ struct State {
 }
 
 /// A yes/no confirmation prompt.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{Confirm, Outcome};
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(true) =
+///     Confirm::new("Deploy to production?").default_yes().run()?
+/// {
+///     println!("deploying");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct Confirm {
     question: String,
     default_yes: bool,

@@ -1,19 +1,10 @@
 # sparcli
 
-[![Crates.io](https://img.shields.io/crates/v/sparcli.svg)](https://crates.io/crates/sparcli)
-[![Docs.rs](https://docs.rs/sparcli/badge.svg)](https://docs.rs/sparcli)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://www.rust-lang.org)
+[![Crates.io](https://img.shields.io/crates/v/sparcli.svg)](https://crates.io/crates/sparcli) [![Docs.rs](https://docs.rs/sparcli/badge.svg)](https://docs.rs/sparcli) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://www.rust-lang.org)
 
-A lightweight, cross-platform toolkit for **styled CLI output** and
-**interactive input widgets** in Rust. It renders directly to the terminal via
-[`crossterm`](https://crates.io/crates/crossterm) (no `ratatui` dependency) but
-mirrors ratatui's familiar vocabulary (`Style`, `Color`, `Span`, `Line`,
-`Text`), so the API feels at home if you already use ratatui.
+A lightweight, cross-platform toolkit for **styled CLI output** and **interactive input widgets** in Rust. It renders directly to the terminal via [`crossterm`](https://crates.io/crates/crossterm) (no `ratatui` dependency) but mirrors ratatui's familiar vocabulary (`Style`, `Color`, `Span`, `Line`, `Text`), so the API feels at home if you already use ratatui.
 
-sparcli is meant for small, lightweight CLI tools: a single accent color, muted
-defaults, rounded borders, graceful `NO_COLOR` and non-terminal behavior. Heavy,
-full-screen/retained TUIs are out of scope (that is what ratatui is for).
+sparcli is meant for small, lightweight CLI tools: a single accent color, muted defaults, rounded borders, graceful `NO_COLOR` and non-terminal behavior. Heavy, full-screen/retained TUIs are out of scope (that is what ratatui is for).
 
 ![sparcli output widgets](https://raw.githubusercontent.com/cgroening/rs-sparcli/main/images/screenshot-1.png)
 
@@ -21,13 +12,8 @@ full-screen/retained TUIs are out of scope (that is what ratatui is for).
 
 ## Highlights
 
-- **Output**: styled text, markup, tables (colspan, striping, wrap, titles),
-  panels, alerts, rules, lists, trees, key-value lists, badges, progress bars,
-  spinners, multi-progress, diffs, columns, live display, pager, and
-  composition helpers (`align`, `pad`, `vstack`).
-- **Input**: confirm, text (validation, char filters, history, ghost
-  autocomplete), password, number (with a calculator), textarea, single/multi
-  select, an inline fuzzy select, and a calendar date picker.
+- **Output**: styled text, markup, tables (colspan, striping, wrap, titles), panels, alerts, rules, lists, trees, key-value lists, badges, progress bars, spinners, multi-progress, diffs, columns, live display, pager, and composition helpers (`align`, `pad`, `vstack`).
+- **Input**: confirm, text (validation, char filters, history, ghost autocomplete), password, number (with a calculator), textarea, single/multi select, an inline fuzzy select, and a calendar date picker.
 - **Unified theme** for input *and* output, set once and overridable per call.
 - **Robust**: no panics on input, RAII terminal restore, `Result`-based errors.
 
@@ -51,8 +37,7 @@ MSRV: Rust 1.88 (edition 2024).
 
 ### From a local checkout or Git
 
-To use an unpublished or local copy instead of the crates.io release, point
-Cargo at the source directory or repository:
+To use an unpublished or local copy instead of the crates.io release, point Cargo at the source directory or repository:
 
 ```toml
 [dependencies]
@@ -81,12 +66,9 @@ fn main() -> sparcli::Result<()> {
 }
 ```
 
-Every output widget implements `Renderable`: call `.print()` to write to stdout,
-or `.print_to(&mut writer)` to capture output. When stdout is not a terminal (a
-pipe, a file, or with `NO_COLOR`), no escape codes are emitted.
+Every output widget implements `Renderable`: call `.print()` to write to stdout, or `.print_to(&mut writer)` to capture output. When stdout is not a terminal (a pipe, a file, or with `NO_COLOR`), no escape codes are emitted.
 
-Widgets like `Panel` frame their content with a rounded border and an optional
-title:
+Widgets like `Panel` frame their content with a rounded border and an optional title:
 
 ```rust
 use sparcli::{Panel, Renderable, Title};
@@ -102,10 +84,7 @@ Panel::new("All systems nominal.")
 ╰──────────────────────╯
 ```
 
-A left-aligned title reads as part of the frame: one connecting border glyph
-sits before it (`╭─ Status ─`), never a flush `╭ Status` - unless the title is
-too wide for the frame, in which case it is truncated into the border rather
-than widening the panel.
+A left-aligned title reads as part of the frame: one connecting border glyph sits before it (`╭─ Status ─`), never a flush `╭ Status` - unless the title is too wide for the frame, in which case it is truncated into the border rather than widening the panel.
 
 ## Input example
 
@@ -125,9 +104,7 @@ fn main() -> sparcli::Result<()> {
 }
 ```
 
-Prompts return `Outcome<T>` (`Submitted(value)`, `Cancelled`, or a fired
-`Shortcut(id)`) and never panic. They require an interactive terminal; without
-one they return `SparcliError::NoTerminal`.
+Prompts return `Outcome<T>` (`Submitted(value)`, `Cancelled`, or a fired `Shortcut(id)`) and never panic. They require an interactive terminal; without one they return `SparcliError::NoTerminal`.
 
 ## Theming
 

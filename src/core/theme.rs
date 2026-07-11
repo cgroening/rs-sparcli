@@ -13,6 +13,22 @@ use crate::core::style::{Color, Style};
 const DEFAULT_ACCENT: Color = Color::Rgb(137, 180, 250);
 
 /// Visual defaults applied across input and output.
+///
+/// Start from [`Theme::default`], adjust the fields you care about, and install
+/// it once with [`set_theme`]; every widget then reads it via [`theme`].
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Color, Theme, set_theme, theme};
+///
+/// let custom = Theme {
+///     accent: Color::Magenta,
+///     ..Theme::default()
+/// };
+/// set_theme(custom);
+/// assert_eq!(theme().accent, Color::Magenta);
+/// ```
 #[derive(Debug, Clone)]
 pub struct Theme {
     /// The single accent color for highlights, active items and titles.
