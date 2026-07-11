@@ -16,6 +16,14 @@ small CLI tools. No async, no ratatui, minimal footprint.
 - **Scope:** output complete; input only single widgets (no Form/App/Args/
   Serde). Fuzzy only as inline Select.
 
+## Python twin – keep in sync
+
+There is a parallel Python version of `sparcli` at
+`/Users/cgroening/Developer/Python/libs/sparcli`. On **every change** to this
+Rust crate, check whether the same change has to be applied to the Python
+version too (behavior, API, docs, tests) – and **ask the user** whether it
+should be ported before proceeding.
+
 ## Architecture (separate layers strictly, §2.6/§7.2)
 
 - `core/` – foundation: style, text, markup, theme, border, geometry, width,
