@@ -103,7 +103,9 @@ Panel::new("All systems nominal.")
 ```
 
 A left-aligned title reads as part of the frame: one connecting border glyph
-sits before it (`╭─ Status ─`), never a flush `╭ Status`.
+sits before it (`╭─ Status ─`), never a flush `╭ Status` - unless the title is
+too wide for the frame, in which case it is truncated into the border rather
+than widening the panel.
 
 ## Input example
 
