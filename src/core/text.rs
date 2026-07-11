@@ -7,6 +7,16 @@ use crate::core::style::Style;
 use crate::core::width::visible_width;
 
 /// A run of text sharing one [`Style`] and an optional hyperlink.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Color, Span, Style};
+///
+/// let span = Span::styled("error", Style::new().fg(Color::Red).bold());
+/// assert_eq!(span.content, "error");
+/// assert_eq!(span.width(), 5);
+/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Span {
     /// The text content (without ANSI escapes).
@@ -62,6 +72,19 @@ impl From<String> for Span {
 }
 
 /// One visual line: a sequence of [`Span`]s.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Color, Line, Span, Style};
+///
+/// let line = Line::new(vec![
+///     Span::raw("status: "),
+///     Span::styled("ok", Style::new().fg(Color::Green)),
+/// ]);
+/// assert_eq!(line.plain(), "status: ok");
+/// assert_eq!(line.width(), 10);
+/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Line {
     /// The spans making up the line.
@@ -120,6 +143,16 @@ impl From<Vec<Span>> for Line {
 }
 
 /// Multi-line rich text.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::Text;
+///
+/// let text = Text::raw("first\nsecond");
+/// assert_eq!(text.height(), 2);
+/// assert_eq!(text.width(), 6);
+/// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Text {
     /// The lines of the text.

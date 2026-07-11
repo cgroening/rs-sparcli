@@ -18,6 +18,15 @@ enum Op {
 }
 
 /// A unified diff between two texts.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Diff, Renderable};
+///
+/// let out = Diff::new("alpha\nbeta\n", "alpha\ngamma\n").render(40);
+/// assert!(out.plain().contains("gamma"));
+/// ```
 pub struct Diff {
     old: String,
     new: String,

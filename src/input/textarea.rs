@@ -15,6 +15,19 @@ use crate::input::line_edit::LineEditor;
 use crate::input::prompt::{Flow, run_prompt};
 
 /// A multi-line text input prompt.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{Outcome, Textarea};
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(notes) = Textarea::new("Notes:").run()? {
+///     println!("{notes}");
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct Textarea {
     prompt: String,
     initial: String,

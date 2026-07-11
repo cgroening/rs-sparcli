@@ -6,6 +6,15 @@ use crate::core::text::{Line, Span};
 use crate::core::theme::theme;
 
 /// A small inline token with configurable caps and style.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Badge, Renderable};
+///
+/// let out = Badge::new("NEW").render(20);
+/// assert!(out.plain().contains("[NEW]"));
+/// ```
 pub struct Badge {
     text: String,
     left_cap: String,

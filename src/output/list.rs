@@ -33,6 +33,16 @@ struct ListItem {
 }
 
 /// A bulleted or ordered list.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{List, Renderable};
+///
+/// let out = List::new().item("First").item("Second").render(40);
+/// assert!(out.plain().contains("First"));
+/// assert!(out.plain().contains("Second"));
+/// ```
 pub struct List {
     marker: Marker,
     items: Vec<ListItem>,

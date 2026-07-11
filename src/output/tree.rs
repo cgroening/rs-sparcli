@@ -30,6 +30,17 @@ impl TreeNode {
 }
 
 /// A tree of [`TreeNode`]s rendered with connector glyphs.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Renderable, Tree, TreeNode};
+///
+/// let out = Tree::new()
+///     .node(TreeNode::new("src").child(TreeNode::new("main.rs")))
+///     .render(40);
+/// assert!(out.plain().contains("main.rs"));
+/// ```
 pub struct Tree {
     roots: Vec<TreeNode>,
     border: BorderType,

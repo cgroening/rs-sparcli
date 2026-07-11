@@ -15,6 +15,19 @@ struct ColumnItem {
 }
 
 /// A horizontal arrangement of rendered blocks.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Columns, Renderable, Text};
+///
+/// let out = Columns::new()
+///     .add(&Text::raw("left"), 6)
+///     .add(&Text::raw("right"), 6)
+///     .render(20);
+/// assert!(out.plain().contains("left"));
+/// assert!(out.plain().contains("right"));
+/// ```
 pub struct Columns {
     items: Vec<ColumnItem>,
     gap: u16,

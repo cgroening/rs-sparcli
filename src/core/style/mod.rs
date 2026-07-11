@@ -12,6 +12,16 @@ pub use self::color::Color;
 use std::ops::{BitOr, BitOrAssign};
 
 /// Text attribute flags (bold, dim, italic, …), combinable with `|`.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::Attribute;
+///
+/// let attrs = Attribute::BOLD | Attribute::UNDERLINED;
+/// assert!(attrs.contains(Attribute::BOLD));
+/// assert!(!attrs.contains(Attribute::ITALIC));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Attribute(u8);
 
@@ -58,6 +68,19 @@ impl BitOrAssign for Attribute {
 pub type Modifier = Attribute;
 
 /// A foreground/background color pair plus text attributes.
+///
+/// Built fluently; every setter consumes and returns `self`.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Attribute, Color, Style};
+///
+/// let style = Style::new().fg(Color::Red).bold().italic();
+/// assert_eq!(style.fg, Some(Color::Red));
+/// assert!(style.attrs.contains(Attribute::BOLD));
+/// assert!(style.attrs.contains(Attribute::ITALIC));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Style {
     /// Foreground color, if set.

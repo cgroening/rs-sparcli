@@ -15,6 +15,18 @@ struct Pair {
 }
 
 /// A list of aligned key-value pairs.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{KeyValue, Renderable};
+///
+/// let out = KeyValue::new()
+///     .add("name", "sparcli")
+///     .add("license", "MIT")
+///     .render(40);
+/// assert!(out.plain().contains("sparcli"));
+/// ```
 pub struct KeyValue {
     pairs: Vec<Pair>,
     separator: String,

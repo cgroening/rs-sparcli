@@ -7,7 +7,20 @@ use crate::core::terminal::ColorSupport;
 /// A terminal color.
 ///
 /// Variant names follow ratatui: the plain names map to the eight standard
-/// ANSI colors, the `Light*` names to their bright variants.
+/// ANSI colors, the `Light*` names to their bright variants. Colors are
+/// downgraded automatically (truecolor -> ANSI-16 -> none) to match the
+/// terminal at render time.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::{Color, Style};
+///
+/// let style = Style::new().fg(Color::Rgb(137, 180, 250));
+/// assert_eq!(Color::from_name("red"), Some(Color::Red));
+/// assert_eq!(Color::from_name("nope"), None);
+/// let _ = style;
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     /// Reset to the terminal's default color.

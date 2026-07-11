@@ -1,7 +1,6 @@
 # Development
 
-How to build, test and work on `sparcli`. Coding conventions live in
-[`CLAUDE.md`](../CLAUDE.md).
+How to build, test and work on `sparcli`. Coding conventions live in [`CLAUDE.md`](../CLAUDE.md).
 
 ## Prerequisites
 
@@ -35,10 +34,7 @@ cargo run --example output-readme --features markup
 cargo run --example prompt-readme
 ```
 
-The gallery also works without features (those widgets are simply omitted).
-Piping the gallery (`| cat`, `> file`) or setting `NO_COLOR=1` yields plain
-text with no escape codes. The `output_dynamic` animations become no-ops
-off-terminal (only the final state prints).
+The gallery also works without features (those widgets are simply omitted). Piping the gallery (`| cat`, `> file`) or setting `NO_COLOR=1` yields plain text with no escape codes. The `output_dynamic` animations become no-ops off-terminal (only the final state prints).
 
 ## Run the tests
 
@@ -57,10 +53,7 @@ cargo test --all-features fuzzy           # tests whose name contains "fuzzy"
 cargo test --all-features -- --nocapture  # show println! output
 ```
 
-Tests never require a real terminal: output widgets are rendered to an
-in-memory buffer and asserted on their visible text, and input prompts are
-driven by a scripted fake event source (`input::event::ScriptedSource`). So the
-whole suite is safe to run headless / in CI.
+Tests never require a real terminal: output widgets are rendered to an in-memory buffer and asserted on their visible text, and input prompts are driven by a scripted fake event source (`input::event::ScriptedSource`). So the whole suite is safe to run headless / in CI.
 
 ## Lint and format
 
@@ -71,9 +64,7 @@ cargo fmt
 cargo fmt --check
 ```
 
-clippy must be warning-free. `cargo fmt` may print two warnings about
-`group_imports`/`imports_granularity` being nightly-only; these are harmless on
-stable (the rules are followed manually, see `rustfmt.toml`).
+clippy must be warning-free. `cargo fmt` may print two warnings about `group_imports`/`imports_granularity` being nightly-only; these are harmless on stable (the rules are followed manually, see `rustfmt.toml`).
 
 ## Feature flags
 
@@ -99,12 +90,9 @@ examples/   Runnable demos (output_gallery, output_dynamic, prompts,
 tests/      End-to-end tests over the public API.
 ```
 
-The `core`/`input`/`output` module tree is `pub(crate)`; the public API is the
-curated set re-exported at the crate root plus the facade modules
-`sparcli::{markup, validate, event, shortcut, width, terminal}` and `prelude`.
+The `core`/`input`/`output` module tree is `pub(crate)`; the public API is the curated set re-exported at the crate root plus the facade modules `sparcli::{markup, validate, event, shortcut, width, terminal}` and `prelude`.
 
-Dependency direction is one-way: `output` and `input` depend on `core`, never
-the reverse. `sparcli` never depends on `ratatui`.
+Dependency direction is one-way: `output` and `input` depend on `core`, never the reverse. `sparcli` never depends on `ratatui`.
 
 ## Useful environment variables
 
@@ -114,24 +102,13 @@ the reverse. `sparcli` never depends on `ratatui`.
 
 ## Logging
 
-`sparcli` uses the [`log`](https://crates.io/crates/log) facade only, and only
-for `warn!`/`debug!` at spots where a `Result` would otherwise be silently
-swallowed (terminal restore in `TerminalGuard`, input-history save/load,
-temp-file cleanup, editor raw-mode toggles). Real errors are returned via
-`SparcliError` and are not logged (no double-logging), there are no `error!`
-calls, and no logger/backend is bundled – the consuming application installs one
-if it wants the output. Keep logging out of hot paths and render loops. See
-`CLAUDE.md` for the full convention.
+`sparcli` uses the [`log`](https://crates.io/crates/log) facade only, and only for `warn!`/`debug!` at spots where a `Result` would otherwise be silently swallowed (terminal restore in `TerminalGuard`, input-history save/load, temp-file cleanup, editor raw-mode toggles). Real errors are returned via `SparcliError` and are not logged (no double-logging), there are no `error!` calls, and no logger/backend is bundled – the consuming application installs one if it wants the output. Keep logging out of hot paths and render loops. See `CLAUDE.md` for the full convention.
 
 ## Adding a widget
 
 1. Add the module under `src/output/` or `src/input/`.
-2. Implement `Renderable` (output) or a `run`/`run_with` pair (input) using the
-   shared `prompt::run_prompt` driver.
+2. Implement `Renderable` (output) or a `run`/`run_with` pair (input) using the shared `prompt::run_prompt` driver.
 3. Add unit tests in a `#[cfg(test)] mod tests` block.
-4. Re-export the public type at the crate root in `src/lib.rs` (and `prelude` if
-   commonly used); free-function utilities go into the relevant facade module,
-   not the `pub(crate)` module tree.
+4. Re-export the public type at the crate root in `src/lib.rs` (and `prelude` if commonly used); free-function utilities go into the relevant facade module, not the `pub(crate)` module tree.
 5. Run `cargo test`, `cargo clippy -- -D warnings`, `cargo fmt`.
-6. Add rustdoc (with a `# Examples` doctest where the usage is not obvious) and
-   update `README.md` and, if relevant, the example gallery.
+6. Add rustdoc (with a `# Examples` doctest where the usage is not obvious) and update `README.md` and, if relevant, the example gallery.

@@ -20,6 +20,19 @@ struct State {
 }
 
 /// A masked password input prompt.
+///
+/// # Examples
+///
+/// ```no_run
+/// use sparcli::{Outcome, PasswordInput};
+///
+/// # fn main() -> sparcli::Result<()> {
+/// if let Outcome::Submitted(secret) = PasswordInput::new("Password:").run()? {
+///     println!("read {} characters", secret.chars().count());
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct PasswordInput {
     prompt: String,
     initial: String,

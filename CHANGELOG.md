@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-11
+
 ### Added
 
 - The terminal hardware cursor is now hidden during in-place redraws (spinner, progress, multi-progress, live) and interactive prompts, and restored on finish, on prompt exit, on drop and on panic. Mirrors the Python port.
