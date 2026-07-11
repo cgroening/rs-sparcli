@@ -12,6 +12,7 @@ use crossterm::queue;
 use crossterm::style::Print;
 use crossterm::terminal::{Clear, ClearType};
 
+use crate::core::cursor;
 use crate::core::render::{Renderable, Rendered, write_line};
 use crate::core::terminal::{color_support, is_output_tty, term_width};
 use crate::error::Result;
@@ -54,6 +55,7 @@ impl InPlace {
             self.last_frame = frame.clone();
             return Ok(());
         }
+        cursor::hide();
         let mut out = io::stdout().lock();
         self.rewind(&mut out)?;
         self.last_height = write_frame(&mut out, frame)?;
@@ -86,26 +88,41 @@ impl InPlace {
         if self.silent {
             return Ok(());
         }
-        let mut out = io::stdout().lock();
-        if self.interactive {
-            queue!(out, Print("\r\n"))?;
-        } else {
-            write_frame(&mut out, &self.last_frame)?;
-            queue!(out, Print("\n"))?;
+        {
+            let mut out = io::stdout().lock();
+            if self.interactive {
+                queue!(out, Print("\r\n"))?;
+            } else {
+                write_frame(&mut out, &self.last_frame)?;
+                queue!(out, Print("\n"))?;
+            }
+            out.flush()?;
         }
-        out.flush()?;
+        cursor::show();
         Ok(())
     }
 
     /// Finishes the session, erasing the last frame (transient display).
     pub(crate) fn clear(mut self) -> Result<()> {
         if !self.silent && self.interactive {
-            let mut out = io::stdout().lock();
-            self.rewind(&mut out)?;
-            self.last_height = 0;
-            out.flush()?;
+            {
+                let mut out = io::stdout().lock();
+                self.rewind(&mut out)?;
+                self.last_height = 0;
+                out.flush()?;
+            }
+            cursor::show();
         }
         Ok(())
+    }
+}
+
+impl Drop for InPlace {
+    fn drop(&mut self) {
+        // Safety net mirroring Python's atexit restore: if a live display or
+        // spinner is dropped mid-animation without finishing, still show the
+        // cursor. Idempotent, so a prior finish/clear makes this a no-op.
+        cursor::show();
     }
 }
 

@@ -23,8 +23,25 @@ pub enum ColorSupport {
 }
 
 /// Returns the terminal size as `(columns, rows)`, falling back to 80x24.
+///
+/// The `COLUMNS` and `LINES` environment variables override each dimension when
+/// set to a positive integer; a dimension left unset is queried from the
+/// terminal, then falls back to the default.
 pub fn terminal_size() -> (u16, u16) {
-    crossterm::terminal::size().unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT))
+    let env_cols = env_dimension("COLUMNS");
+    let env_rows = env_dimension("LINES");
+    if let (Some(cols), Some(rows)) = (env_cols, env_rows) {
+        return (cols, rows);
+    }
+    let (cols, rows) =
+        crossterm::terminal::size().unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
+    (env_cols.unwrap_or(cols), env_rows.unwrap_or(rows))
+}
+
+/// Reads a positive terminal dimension from the environment, if present.
+fn env_dimension(key: &str) -> Option<u16> {
+    let value = env::var(key).ok()?;
+    value.trim().parse::<u16>().ok().filter(|&n| n > 0)
 }
 
 /// Returns the terminal width in columns (fallback 80).
@@ -62,8 +79,11 @@ fn env_enabled(key: &str) -> bool {
 
 /// Returns `true` if `COLORTERM` advertises truecolor support.
 fn colorterm_truecolor() -> bool {
-    matches!(env::var("COLORTERM"), Ok(value)
-        if value.contains("truecolor") || value.contains("24bit"))
+    let Ok(value) = env::var("COLORTERM") else {
+        return false;
+    };
+    let value = value.to_lowercase();
+    value.contains("truecolor") || value.contains("24bit")
 }
 
 /// Detects the color support of the output terminal.
