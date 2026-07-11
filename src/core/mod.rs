@@ -5,6 +5,7 @@
 //! terminal capabilities and the render model.
 
 pub mod border;
+pub(crate) mod cursor;
 pub mod geometry;
 pub mod render;
 pub mod style;

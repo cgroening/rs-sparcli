@@ -102,7 +102,7 @@ impl Alert {
 }
 
 impl Renderable for Alert {
-    fn render(&self, _max_width: u16) -> Rendered {
+    fn render(&self, max_width: u16) -> Rendered {
         let theme = theme();
         let style = self.kind.style(&theme);
         let body =
@@ -113,7 +113,7 @@ impl Renderable for Alert {
             padding: Edges::symmetric(0, 1),
             ..BoxOpts::default()
         };
-        draw_box(&body, &opts)
+        draw_box(&body, &opts, max_width)
     }
 }
 

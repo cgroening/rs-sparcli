@@ -30,10 +30,11 @@ fn table_renders_headers_and_rows() {
 
 #[test]
 fn panel_frames_titled_content() {
-    let panel = Panel::new("hello").title(Title::new("Greeting"));
+    let panel =
+        Panel::new("hello from the panel body").title(Title::new("Greeting"));
     let output = visible(&panel);
     assert!(output.contains("Greeting"));
-    assert!(output.contains("hello"));
+    assert!(output.contains("hello from the panel body"));
 }
 
 #[test]

@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Added
+
+- The terminal hardware cursor is now hidden during in-place redraws (spinner, progress, multi-progress, live) and interactive prompts, and restored on finish, on prompt exit, on drop and on panic. Mirrors the Python port.
+
+### Changed
+
+- `Panel` and `Alert` now honour the render width: a fixed width is capped to the terminal, overflowing natural content shrinks the frame, and a title too wide for the interior is truncated (`…`) instead of widening the box.
+- Inline markup matches attribute names and the `on` background keyword case-insensitively (`[BOLD]`, `[white ON blue]`), and a tag opened inside a backtick code span no longer defeats the closing backtick.
+- `truncate` never exceeds `max_cols`: a width of `0` yields an empty string, and an ellipsis wider than `max_cols` is clamped to fit.
+- `strip_ansi` recognises the full CSI final-byte range (`0x40..=0x7e`), so escape sequences ending in a non-letter byte are stripped correctly.
+- `COLORTERM` is matched case-insensitively when detecting truecolor support.
+- `terminal_size` honours the `COLUMNS`/`LINES` environment variables before querying the terminal.
+
+### Notes
+
+- `DatePicker`'s initial "today" remains UTC here (dependency-free), while the Python port uses the local date. This one-point divergence is intentional; near midnight the default day can differ by one between the two ports.
+
 ## [0.2.1] - 2026-07-10
 
 ### Added

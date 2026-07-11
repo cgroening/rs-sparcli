@@ -54,6 +54,7 @@ struct Parser {
     lines: Vec<Line>,
     spans: Vec<Span>,
     buffer: String,
+    in_code: bool,
 }
 
 impl Parser {
@@ -63,6 +64,7 @@ impl Parser {
             lines: Vec::new(),
             spans: Vec::new(),
             buffer: String::new(),
+            in_code: false,
         }
     }
 
@@ -124,23 +126,19 @@ impl Parser {
     /// Toggles a code span on or off using the code style.
     fn toggle_code(&mut self) {
         self.flush_span();
-        let in_code = self.stack.len() > 1
-            && self.stack.last() == Some(&code_style(self.base_style()));
-        if in_code {
-            self.stack.pop();
+        if self.in_code {
+            if self.stack.len() > 1 {
+                self.stack.pop();
+            }
         } else {
             self.stack.push(code_style(self.current_style()));
         }
+        self.in_code = !self.in_code;
     }
 
     /// Returns the cumulative style at the top of the stack.
     fn current_style(&self) -> Style {
         *self.stack.last().unwrap_or(&Style::new())
-    }
-
-    /// Returns the base (bottom) style of the stack.
-    fn base_style(&self) -> Style {
-        *self.stack.first().unwrap_or(&Style::new())
     }
 
     /// Flushes the text buffer into a span with the current style.
@@ -167,10 +165,19 @@ impl Parser {
 }
 
 /// Parses a space-separated style spec into a [`Style`].
+///
+/// Attribute names and the `on` background keyword are matched
+/// case-insensitively; color tokens keep their original casing (hex and named
+/// colors are parsed case-insensitively anyway).
 fn parse_specs(tag: &str) -> Style {
     let mut style = Style::new();
     let mut expect_background = false;
     for token in tag.split_whitespace() {
+        let lowered = token.to_ascii_lowercase();
+        if lowered == "on" {
+            expect_background = true;
+            continue;
+        }
         if expect_background {
             if let Some(color) = parse_color(token) {
                 style = style.bg(color);
@@ -178,18 +185,17 @@ fn parse_specs(tag: &str) -> Style {
             expect_background = false;
             continue;
         }
-        if token == "on" {
-            expect_background = true;
-            continue;
-        }
-        style = apply_token(style, token);
+        style = apply_token(style, &lowered, token);
     }
     style
 }
 
 /// Applies a single attribute or foreground color token to `style`.
-fn apply_token(style: Style, token: &str) -> Style {
-    match token {
+///
+/// `lowered` is matched against the attribute names; `token` keeps its casing
+/// for color parsing.
+fn apply_token(style: Style, lowered: &str, token: &str) -> Style {
+    match lowered {
         "bold" | "b" => style.bold(),
         "dim" | "d" => style.dim(),
         "italic" | "i" => style.italic(),
@@ -268,5 +274,28 @@ mod tests {
     fn code_span_gets_code_style() {
         let text = parse("`x`");
         assert_eq!(text.lines[0].spans[0].style.fg, Some(Color::Cyan));
+    }
+
+    #[test]
+    fn attribute_tokens_are_case_insensitive() {
+        let text = parse("[BOLD]x[/]");
+        assert!(text.lines[0].spans[0].style.attrs.contains(Attribute::BOLD));
+    }
+
+    #[test]
+    fn background_keyword_is_case_insensitive() {
+        let text = parse("[white ON blue]x[/]");
+        assert_eq!(text.lines[0].spans[0].style.bg, Some(Color::Blue));
+    }
+
+    #[test]
+    fn tag_inside_code_span_still_closes() {
+        // Opening a tag inside a backtick span must not defeat the closing
+        // backtick: after it, the tag's layer is popped, so trailing text no
+        // longer carries the bold attribute.
+        let text = parse("`[bold]a`b");
+        let trailing = text.lines[0].spans.last().unwrap();
+        assert_eq!(trailing.content, "b");
+        assert!(!trailing.style.attrs.contains(Attribute::BOLD));
     }
 }

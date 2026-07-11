@@ -9,6 +9,10 @@ use unicode_width::UnicodeWidthStr;
 /// The ASCII escape byte that starts ANSI sequences.
 const ESC: char = '\u{1b}';
 
+/// Inclusive range of CSI final bytes (`0x40..=0x7e`) that end a sequence.
+const CSI_FINAL_MIN: char = '\u{40}';
+const CSI_FINAL_MAX: char = '\u{7e}';
+
 /// Returns the visible column width of `text`, ignoring ANSI escapes.
 pub fn visible_width(text: &str) -> usize {
     if !text.contains(ESC) {
@@ -49,7 +53,7 @@ fn skip_escape_sequence(chars: &mut std::iter::Peekable<std::str::Chars>) {
 fn skip_csi(chars: &mut std::iter::Peekable<std::str::Chars>) {
     chars.next(); // consume '['
     for ch in chars.by_ref() {
-        if ch.is_ascii_alphabetic() || ch == '~' {
+        if (CSI_FINAL_MIN..=CSI_FINAL_MAX).contains(&ch) {
             break;
         }
     }
@@ -72,13 +76,21 @@ fn skip_osc(chars: &mut std::iter::Peekable<std::str::Chars>) {
 /// Truncates `text` to at most `max_cols` columns, appending `ellipsis` when
 /// content was dropped.
 ///
-/// Never splits a wide glyph; assumes `text` contains no ANSI escapes.
+/// Never splits a wide glyph; assumes `text` contains no ANSI escapes. The
+/// result never exceeds `max_cols` columns: a `max_cols` of zero yields the
+/// empty string, and an ellipsis wider than `max_cols` is clamped to fit.
 pub fn truncate(text: &str, max_cols: usize, ellipsis: &str) -> String {
+    if max_cols == 0 {
+        return String::new();
+    }
     if UnicodeWidthStr::width(text) <= max_cols {
         return text.to_string();
     }
     let ellipsis_width = UnicodeWidthStr::width(ellipsis);
-    let budget = max_cols.saturating_sub(ellipsis_width);
+    if ellipsis_width >= max_cols {
+        return ellipsis.chars().take(max_cols).collect();
+    }
+    let budget = max_cols - ellipsis_width;
     let mut out = String::new();
     let mut used = 0;
     for ch in text.chars() {
@@ -191,6 +203,24 @@ mod tests {
     fn truncate_does_not_split_wide_glyphs() {
         // Each CJK glyph is two columns; budget 3 fits one glyph + ellipsis.
         assert_eq!(truncate("中文字", 3, "…"), "中…");
+    }
+
+    #[test]
+    fn truncate_with_zero_columns_is_empty() {
+        assert_eq!(truncate("hello", 0, "…"), "");
+    }
+
+    #[test]
+    fn truncate_clamps_ellipsis_wider_than_max() {
+        // The ellipsis alone exceeds the budget, so it is clamped to fit.
+        assert_eq!(truncate("hello", 2, "..."), "..");
+        assert_eq!(visible_width(&truncate("hello", 2, "...")), 2);
+    }
+
+    #[test]
+    fn strip_ansi_handles_non_letter_csi_final_byte() {
+        // `@` (0x40) is a valid CSI final byte and must end the sequence.
+        assert_eq!(strip_ansi("\u{1b}[1@x"), "x");
     }
 
     #[test]

@@ -24,6 +24,12 @@ Rust crate, check whether the same change has to be applied to the Python
 version too (behavior, API, docs, tests) – and **ask the user** whether it
 should be ported before proceeding.
 
+**Known intentional divergence:** `Date::today()` returns a **UTC** date here
+(dependency-free, no local-time API in `std`), while the Python port uses the
+**local** date. Near midnight the `DatePicker`'s default day can differ by one
+between the two ports. Do not "fix" this into parity by adding a time-zone
+dependency without user sign-off.
+
 ## Architecture (separate layers strictly, §2.6/§7.2)
 
 - `core/` – foundation: style, text, markup, theme, border, geometry, width,
