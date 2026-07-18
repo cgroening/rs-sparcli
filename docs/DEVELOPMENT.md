@@ -81,7 +81,7 @@ clippy must be warning-free. `cargo fmt` may print two warnings about `group_imp
 ```
 src/
   core/     Foundation: style, text, markup, theme, border, geometry,
-            width, terminal, render. No widget logic.
+            width, terminal, render, command. No widget logic.
   output/   Printable widgets implementing `Renderable`.
   input/    Interactive prompts over an `EventSource`, plus the shared
             line editor, terminal guard and prompt driver.

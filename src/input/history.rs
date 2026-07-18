@@ -2,12 +2,18 @@
 
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::error::Result;
 
 /// Default maximum number of retained entries.
 const DEFAULT_MAX: usize = 500;
+
+/// Name of the history file inside the per-app state directory.
+const HISTORY_FILE: &str = "history";
+
+/// Characters that would let an app name escape its state subdirectory.
+const PATH_SEPARATORS: [char; 3] = ['/', '\\', ':'];
 
 /// A bounded list of past input lines, optionally backed by a file.
 pub struct History {
@@ -36,10 +42,13 @@ impl History {
 
     /// Creates a history persisted under the app's state directory.
     ///
-    /// Uses `XDG_STATE_HOME` (or `~/.local/state`, or `%LOCALAPPDATA%`).
+    /// Uses `XDG_STATE_HOME` (or `~/.local/state`, or `%LOCALAPPDATA%`). Both
+    /// the directory and `app` come from outside the process, so the directory
+    /// is canonicalized and `app` is rejected outright if it could escape it;
+    /// such a history stays in memory instead of writing somewhere unexpected.
     pub fn for_app(app: &str) -> Self {
         Self {
-            path: state_dir().map(|dir| dir.join(app).join("history")),
+            path: state_dir().and_then(|dir| history_path(&dir, app)),
             ..Self::new()
         }
     }
@@ -132,19 +141,52 @@ impl History {
     }
 }
 
+/// Returns the history file for `app` under `dir`, or `None` if unusable.
+///
+/// The app name must not be empty, a dot component, or contain a path
+/// separator, and the joined path must still sit inside `dir`.
+fn history_path(dir: &Path, app: &str) -> Option<PathBuf> {
+    if app.is_empty() || app == "." || app == ".." {
+        log::warn!("refusing unsafe history app name: {app:?}");
+        return None;
+    }
+    if app.contains(PATH_SEPARATORS) {
+        log::warn!("refusing unsafe history app name: {app:?}");
+        return None;
+    }
+    let candidate = dir.join(app).join(HISTORY_FILE);
+    if !candidate.starts_with(dir) {
+        log::warn!("refusing history path outside the state dir: {app:?}");
+        return None;
+    }
+    Some(candidate)
+}
+
 /// Resolves the platform state directory for persisted history.
+///
+/// The value comes from the environment, so it is normalized to an absolute
+/// path before anything is written under it.
 fn state_dir() -> Option<PathBuf> {
     if let Some(dir) = env::var_os("XDG_STATE_HOME") {
-        return Some(PathBuf::from(dir));
+        return Some(absolute(PathBuf::from(dir)));
     }
     #[cfg(windows)]
     {
-        env::var_os("LOCALAPPDATA").map(PathBuf::from)
+        env::var_os("LOCALAPPDATA").map(|dir| absolute(PathBuf::from(dir)))
     }
     #[cfg(not(windows))]
     {
-        env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/state"))
+        env::var_os("HOME")
+            .map(|home| absolute(PathBuf::from(home).join(".local/state")))
     }
+}
+
+/// Returns `path` made absolute, falling back to the input if that fails.
+///
+/// `canonicalize` needs the path to exist, which it may not yet, so this uses
+/// `std::path::absolute` and only normalizes lexically.
+fn absolute(path: PathBuf) -> PathBuf {
+    std::path::absolute(&path).unwrap_or(path)
 }
 
 #[cfg(test)]
@@ -187,5 +229,45 @@ mod tests {
         assert_eq!(names, vec!["history".to_string()]);
         assert_eq!(fs::read_to_string(dir.join("history")).unwrap(), "one");
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_plain_app_name_yields_a_path_inside_the_state_dir() {
+        let dir = Path::new("/tmp/sparcli-state");
+        let path = history_path(dir, "demo").unwrap();
+        assert_eq!(path, dir.join("demo").join("history"));
+    }
+
+    #[test]
+    fn a_traversing_app_name_is_rejected() {
+        let dir = Path::new("/tmp/sparcli-state");
+        assert!(history_path(dir, "../../etc").is_none());
+    }
+
+    #[test]
+    fn an_app_name_with_a_separator_is_rejected() {
+        let dir = Path::new("/tmp/sparcli-state");
+        assert!(history_path(dir, "a/b").is_none());
+        assert!(history_path(dir, "a\\b").is_none());
+    }
+
+    #[test]
+    fn a_dot_app_name_is_rejected() {
+        let dir = Path::new("/tmp/sparcli-state");
+        assert!(history_path(dir, ".").is_none());
+        assert!(history_path(dir, "..").is_none());
+    }
+
+    #[test]
+    fn an_empty_app_name_is_rejected() {
+        assert!(history_path(Path::new("/tmp/sparcli-state"), "").is_none());
+    }
+
+    #[test]
+    fn a_rejected_app_name_leaves_the_history_in_memory() {
+        let mut history = History::for_app("../escape");
+        history.add("secret");
+        history.save().unwrap();
+        assert_eq!(history.entries(), &["secret"]);
     }
 }

@@ -6,6 +6,7 @@
 use std::env;
 use std::process::{Command, Stdio};
 
+use crate::core::command::split_command;
 use crate::core::render::{Renderable, write_rendered};
 use crate::core::terminal::{ColorSupport, is_output_tty, term_width};
 use crate::error::{Result, SparcliError};
@@ -57,19 +58,21 @@ impl Pager {
     /// # Errors
     ///
     /// Returns [`SparcliError::Io`] if spawning the pager or writing fails,
-    /// or [`SparcliError::Config`] if the pager command is empty.
+    /// or [`SparcliError::Config`] if the pager command is empty or has an
+    /// unbalanced quote.
     pub fn page(&self, content: &impl Renderable) -> Result<()> {
         if !self.always && !is_output_tty() {
             return content.print();
         }
         let rendered = content.render(term_width());
-        let argv = self.resolve_command();
-        let mut parts = argv.split_whitespace();
-        let program = parts
-            .next()
+        let resolved = self.resolve_command();
+        let argv = split_command(&resolved)
+            .ok_or_else(|| SparcliError::Config("unparsable pager".into()))?;
+        let (program, args) = argv
+            .split_first()
             .ok_or_else(|| SparcliError::Config("empty pager".into()))?;
         let mut child = Command::new(program)
-            .args(parts)
+            .args(args)
             .stdin(Stdio::piped())
             .spawn()?;
         let mut stdin = child

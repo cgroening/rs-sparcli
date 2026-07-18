@@ -18,7 +18,7 @@ There is a parallel Python version of `sparcli` at `/Users/cgroening/Developer/P
 
 ## Architecture (separate layers strictly, §2.6/§7.2)
 
-- `core/` – foundation: style, text, markup, theme, border, geometry, width, terminal, render. No widget logic.
+- `core/` – foundation: style, text, markup, theme, border, geometry, width, terminal, render, `command` (quote-aware command-line splitting for `$EDITOR`/`$PAGER`). No widget logic.
 - `output/` – printable widgets, implement `Renderable`.
 - `input/` – interactive prompts via `EventSource` (DI) + `frame` redraw + `line_edit` (SSOT for text input).
 - Dependency direction: `output`/`input` → `core`. Never cyclic.
