@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Added
+
+- `core::command::split_command` splits a configured command line into an argument vector, honoring single and double quotes. Written by hand rather than pulling in a crate, keeping the dependency set unchanged.
+
+### Fixed
+
+- `$EDITOR`, `$VISUAL` and `$PAGER` are split with `split_command` instead of `split_whitespace`, so an editor or pager path containing spaces (`/Applications/Sublime Text/subl`) no longer breaks into invalid arguments. A command with an unbalanced quote now reports `SparcliError::Config` instead of being silently mangled. Mirrors the Python port.
+- The history state directory is normalized to an absolute path, and an application name that is empty, a dot component, or contains a path separator is rejected instead of being written outside the state directory. Such a history stays in memory. Mirrors the Python port.
+
 ## [0.3.0] - 2026-07-11
 
 ### Added

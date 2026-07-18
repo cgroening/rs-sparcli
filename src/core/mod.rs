@@ -2,9 +2,10 @@
 //!
 //! Nothing here knows about concrete widgets; the modules provide colors and
 //! styles, rich text, geometry, borders, the unified theme, width math,
-//! terminal capabilities and the render model.
+//! terminal capabilities, command-line splitting and the render model.
 
 pub mod border;
+pub mod command;
 pub(crate) mod cursor;
 pub mod geometry;
 pub mod render;

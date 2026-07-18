@@ -8,12 +8,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::core::command::split_command;
 use crate::error::{Result, SparcliError};
 
 /// Opens an external editor on `path`, blocking until it exits.
 ///
 /// `command` overrides the editor; otherwise `$VISUAL`, then `$EDITOR`, then a
-/// platform default is used. The command is whitespace-split (no shell).
+/// platform default is used. The command is split with [`split_command`], so a
+/// quoted path containing spaces survives; it is never passed to a shell.
 ///
 /// # Errors
 ///
@@ -21,11 +23,13 @@ use crate::error::{Result, SparcliError};
 /// [`SparcliError::Config`] if the resolved command is empty.
 pub fn edit_file(command: Option<&str>, path: &Path) -> Result<()> {
     let resolved = resolve_command(command);
-    let mut parts = resolved.split_whitespace();
-    let program = parts
-        .next()
+    let argv = split_command(&resolved).ok_or_else(|| {
+        SparcliError::Config("unparsable editor command".into())
+    })?;
+    let (program, args) = argv
+        .split_first()
         .ok_or_else(|| SparcliError::Config("empty editor command".into()))?;
-    Command::new(program).args(parts).arg(path).status()?;
+    Command::new(program).args(args).arg(path).status()?;
     Ok(())
 }
 
