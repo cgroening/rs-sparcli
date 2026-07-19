@@ -21,9 +21,9 @@ sparcli is meant for small, lightweight CLI tools: a single accent color, muted 
 
 ```toml
 [dependencies]
-sparcli = "0.2"
+sparcli = "0.4"
 # Opt-in features (the base stays small):
-# sparcli = { version = "0.2", features = ["markup", "fuzzy", "pager"] }
+# sparcli = { version = "0.4", features = ["markup", "fuzzy", "pager"] }
 ```
 
 MSRV: Rust 1.88 (edition 2024).
