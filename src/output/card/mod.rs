@@ -181,6 +181,21 @@ impl Card {
     }
 
     /// Adds an outer border around the surface.
+    ///
+    /// [`BorderType::Tall`] is the one border a card draws natively: a thin
+    /// block frame whose strokes come out equally thick on both axes and whose
+    /// corners close. It needs both truecolor and Unicode glyphs to read, and
+    /// degrades to [`BorderType::Thick`] (or to [`BorderType::Ascii`] when the
+    /// theme disables Unicode) otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sparcli::{BorderType, Card, Renderable};
+    ///
+    /// let out = Card::new("Deployed.").border(BorderType::Tall).render(30);
+    /// assert_eq!(out.height(), 5);
+    /// ```
     #[must_use]
     pub fn border(mut self, border: BorderType) -> Self {
         self.opts.border = border;

@@ -118,6 +118,14 @@ fn cards() -> Result<()> {
         .width(52)
         .print()?;
     println!();
+    Card::new("A thin block frame with even strokes and closed corners.")
+        .title("Tall border")
+        .accent(Color::from_hex("#cba6f7").unwrap_or(Color::Magenta))
+        .border(BorderType::Tall)
+        .title_padding(Edges::symmetric(1, 1))
+        .width(52)
+        .print()?;
+    println!();
     Card::new("Centered, flat title, wider padding.")
         .title("Flat")
         .accent(Color::from_hex("#f9e2af").unwrap_or(Color::Yellow))

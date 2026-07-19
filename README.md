@@ -102,6 +102,21 @@ A card fills the width it is rendered into, wraps its content, and carries no bo
 
 Because the derived shades all collapse onto the same ANSI-16 color, a card drops its backgrounds below truecolor support and renders as accented text instead - readable everywhere, rather than an unreadable block.
 
+`BorderType::Tall` is the one border a card draws natively - a thin block frame around the filled surface, following the geometry of Textual's `wide` border:
+
+```rust
+use sparcli::{BorderType, Card, Renderable};
+
+Card::new("A thin block frame bounds the surface.")
+    .title("Tall")
+    .border(BorderType::Tall)
+    .print()?;
+```
+
+The side bars ink a quarter of their cell's width and the top and bottom lines an eighth of their cell's height - the same number of pixels, since a terminal cell is about twice as tall as it is wide. The horizontal lines run across the corner cells too, so the corners close.
+
+Only `Card` renders it that way, because the bars need a filled surface to read against; `Panel`, `Table` and the other framed widgets receive the heavy line glyphs instead. The same degradation applies to a card without truecolor support, and to `Ascii` when the theme disables Unicode.
+
 ## Input example
 
 ```rust
