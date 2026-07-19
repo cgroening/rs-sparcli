@@ -51,6 +51,18 @@ fn card_renders_title_content_and_footer() {
 }
 
 #[test]
+fn card_draws_a_tall_border() {
+    let card = Card::new("bounded by half-block bars")
+        .title("Tall")
+        .border(BorderType::Tall)
+        .width(40);
+    let output = visible(&card);
+    assert!(output.contains("bounded by half-block bars"));
+    // Without truecolor the bars degrade to the heavy frame, so accept either.
+    assert!(output.contains('▊') || output.contains('┃'), "{output}");
+}
+
+#[test]
 fn alert_renders_message() {
     assert!(visible(&Alert::success("done")).contains("done"));
 }

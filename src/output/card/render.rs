@@ -6,12 +6,13 @@
 //! columns, the alignment slack and the border glyphs with the region's
 //! background - and rebases the content spans onto it.
 
-use crate::core::border::BorderType;
+use crate::core::border::{BorderType, TALL};
 use crate::core::geometry::{Align, Edges, Position};
 use crate::core::render::{Renderable, Rendered};
 use crate::core::style::Style;
 use crate::core::terminal::{ColorSupport, color_support};
 use crate::core::text::{Line, Span};
+use crate::core::theme::theme;
 use crate::core::width::{truncate_line, wrap_line};
 use crate::output::card::Card;
 use crate::output::card::palette::{self, CardStyles};
@@ -22,9 +23,36 @@ const BORDER_COLUMNS: usize = 2;
 /// Marker appended to content that had to be truncated.
 const ELLIPSIS: &str = "…";
 
+/// The terminal capabilities a card renders against.
+///
+/// Bundling them keeps the render seam at one parameter and makes both
+/// degradations testable without touching the global theme or environment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RenderCaps {
+    /// How much color the terminal supports.
+    pub support: ColorSupport,
+    /// Whether Unicode glyphs may be used.
+    pub unicode: bool,
+}
+
+impl RenderCaps {
+    /// Returns the capabilities of a fully capable terminal.
+    #[cfg(test)]
+    pub(crate) fn truecolor() -> Self {
+        Self {
+            support: ColorSupport::TrueColor,
+            unicode: true,
+        }
+    }
+}
+
 impl Renderable for Card {
     fn render(&self, max_width: u16) -> Rendered {
-        self.render_with(max_width, color_support())
+        let caps = RenderCaps {
+            support: color_support(),
+            unicode: theme().unicode,
+        };
+        self.render_with(max_width, caps)
     }
 }
 
@@ -57,32 +85,53 @@ impl Region {
 }
 
 impl Card {
-    /// Renders the card for an explicit color-support level.
+    /// Renders the card for explicit terminal capabilities.
     ///
-    /// [`Renderable::render`] detects the level from the environment; this is
-    /// the seam that keeps the decision testable, since under `cargo test`
-    /// standard output is not a terminal and detection would always report
-    /// [`ColorSupport::None`].
+    /// [`Renderable::render`] detects them from the environment and the theme;
+    /// this is the seam that keeps both degradations testable, since under
+    /// `cargo test` standard output is not a terminal and detection would
+    /// always report [`ColorSupport::None`].
     pub(crate) fn render_with(
         &self,
         max_width: u16,
-        support: ColorSupport,
+        caps: RenderCaps,
     ) -> Rendered {
+        let border = self.effective_border(caps);
         let outer = self.opts.width.map_or(max_width, |w| w.min(max_width));
-        let border_columns = self.border_columns();
+        let border_columns = border_columns(border);
         let outer = outer as usize;
         if outer <= border_columns {
             return Rendered::empty();
         }
-        let styles = self.resolved_styles(support);
+        let styles = self.resolved_styles(caps.support);
         let surface = outer - border_columns;
-        self.assemble(&self.regions(&styles, surface))
+        self.assemble(&self.regions(&styles, surface, border), border)
+    }
+
+    /// Resolves the border type actually drawn.
+    ///
+    /// A tall border is built from half blocks whose bar only reads against a
+    /// contrasting surface, so it needs both truecolor and Unicode glyphs.
+    /// Without either it degrades to the heavy frame its glyph set already
+    /// maps to. Other border types are returned unchanged, so a card does not
+    /// diverge from [`Panel`](crate::output::panel::Panel) here.
+    fn effective_border(&self, caps: RenderCaps) -> BorderType {
+        if !self.opts.border.is_tall() {
+            return self.opts.border;
+        }
+        if !caps.unicode {
+            return BorderType::Ascii;
+        }
+        if caps.support != ColorSupport::TrueColor {
+            return BorderType::Thick;
+        }
+        BorderType::Tall
     }
 
     /// Builds all rows of the card, top to bottom.
-    fn assemble(&self, regions: &CardRegions) -> Rendered {
+    fn assemble(&self, regions: &CardRegions, border: BorderType) -> Rendered {
         let mut lines = Vec::new();
-        let has_border = !self.opts.border.is_none();
+        let has_border = !border.is_none();
         if has_border {
             lines.push(edge_row(regions.top(), Position::Top));
         }
@@ -97,15 +146,6 @@ impl Card {
             lines.push(edge_row(regions.bottom(), Position::Bottom));
         }
         Rendered::new(lines)
-    }
-
-    /// Returns the columns the vertical border glyphs consume.
-    fn border_columns(&self) -> usize {
-        if self.opts.border.is_none() {
-            0
-        } else {
-            BORDER_COLUMNS
-        }
     }
 
     /// Derives the palette and applies the per-slot overrides on top.
@@ -131,7 +171,12 @@ impl Card {
     }
 
     /// Builds the three regions a card is made of.
-    fn regions(&self, styles: &CardStyles, surface: usize) -> CardRegions {
+    fn regions(
+        &self,
+        styles: &CardStyles,
+        surface: usize,
+        border: BorderType,
+    ) -> CardRegions {
         let title_surface = surface_of(styles.title);
         let footer_surface = surface_of(styles.footer);
         CardRegions {
@@ -142,7 +187,7 @@ impl Card {
                 text: styles.title,
                 surface: title_surface,
                 border: border_over(styles.border, title_surface),
-                border_type: self.opts.border,
+                border_type: border,
                 wrap: self.opts.wrap,
             },
             content: Region {
@@ -152,7 +197,7 @@ impl Card {
                 text: styles.content,
                 surface: styles.fill,
                 border: border_over(styles.border, styles.fill),
-                border_type: self.opts.border,
+                border_type: border,
                 wrap: self.opts.wrap,
             },
             footer: Region {
@@ -162,13 +207,18 @@ impl Card {
                 text: styles.footer,
                 surface: footer_surface,
                 border: border_over(styles.border, footer_surface),
-                border_type: self.opts.border,
+                border_type: border,
                 wrap: self.opts.wrap,
             },
             has_title: self.title.is_some(),
             has_footer: self.footer.is_some(),
         }
     }
+}
+
+/// Returns the columns the vertical border glyphs consume.
+fn border_columns(border: BorderType) -> usize {
+    if border.is_none() { 0 } else { BORDER_COLUMNS }
 }
 
 /// The three regions of a card plus which optional ones are present.
@@ -235,27 +285,30 @@ fn fit(line: &Line, area: usize, wrap: bool) -> Vec<Line> {
 /// border glyph - every cell carrying the region's background.
 fn region_row(line: Line, region: &Region) -> Line {
     let mut spans = Vec::new();
-    push_vertical(&mut spans, region);
+    push_left_border(&mut spans, region);
     push_padding(&mut spans, region.padding.left, region.surface);
     let rebased = rebase(line, region.text);
     let padded = pad_line(rebased, region.area(), region.align, region.surface);
     spans.extend(padded.spans);
     push_padding(&mut spans, region.padding.right, region.surface);
-    push_vertical(&mut spans, region);
+    push_right_border(&mut spans, region);
     Line::new(spans)
 }
 
 /// Builds an empty row of the region's surface.
 fn blank_row(region: &Region) -> Line {
     let mut spans = Vec::new();
-    push_vertical(&mut spans, region);
+    push_left_border(&mut spans, region);
     spans.extend(blank_line(region.width, region.surface).spans);
-    push_vertical(&mut spans, region);
+    push_right_border(&mut spans, region);
     Line::new(spans)
 }
 
 /// Builds the top or bottom border row of a region.
 fn edge_row(region: &Region, position: Position) -> Line {
+    if region.border_type.is_tall() {
+        return tall_edge_row(region, position);
+    }
     let chars = region.border_type.chars();
     let (left, right) = match position {
         Position::Top => (chars.top_left, chars.top_right),
@@ -270,13 +323,62 @@ fn edge_row(region: &Region, position: Position) -> Line {
     Line::new(vec![Span::styled(content, region.border)])
 }
 
-/// Appends a vertical border glyph, unless the card is unframed.
-fn push_vertical(spans: &mut Vec<Span>, region: &Region) {
+/// Builds a tall border's horizontal row.
+///
+/// The line runs across the corner cells as well, which is what closes the
+/// corner, and it carries no surface behind it so the colored area begins at
+/// the line rather than a row above it.
+fn tall_edge_row(region: &Region, position: Position) -> Line {
+    let glyph = match position {
+        Position::Top => TALL.top,
+        Position::Bottom => TALL.bottom,
+    };
+    let width = region.width + BORDER_COLUMNS;
+    let style = Style {
+        bg: None,
+        ..region.border
+    };
+    Line::new(vec![Span::styled(glyph.to_string().repeat(width), style)])
+}
+
+/// Appends the left border glyph, unless the card is unframed.
+fn push_left_border(spans: &mut Vec<Span>, region: &Region) {
     if region.border_type.is_none() {
+        return;
+    }
+    let glyph = if region.border_type.is_tall() {
+        TALL.left
+    } else {
+        region.border_type.chars().vertical
+    };
+    spans.push(Span::styled(glyph.to_string(), region.border));
+}
+
+/// Appends the right border glyph, unless the card is unframed.
+fn push_right_border(spans: &mut Vec<Span>, region: &Region) {
+    if region.border_type.is_none() {
+        return;
+    }
+    if region.border_type.is_tall() {
+        let style = swap_colors(region.border);
+        spans.push(Span::styled(TALL.right.to_string(), style));
         return;
     }
     let glyph = region.border_type.chars().vertical;
     spans.push(Span::styled(glyph.to_string(), region.border));
+}
+
+/// Returns `style` with foreground and background swapped.
+///
+/// A tall border's right-hand glyph inks the left three quarters of its cell;
+/// swapping turns the remaining quarter into the bar, which is the only way to
+/// get a right-aligned quarter block - Unicode does not define one. Returns
+/// the style unchanged when either color is unset, since the swap needs both.
+fn swap_colors(style: Style) -> Style {
+    let (Some(fg), Some(bg)) = (style.fg, style.bg) else {
+        return style;
+    };
+    style.fg(bg).bg(fg)
 }
 
 /// Appends `columns` padding cells carrying the surface background.
@@ -330,7 +432,7 @@ mod tests {
     /// Renders a card at truecolor, bypassing the environment detection that
     /// would report [`ColorSupport::None`] under `cargo test`.
     fn render(card: Card, width: u16) -> Rendered {
-        card.render_with(width, ColorSupport::TrueColor)
+        card.render_with(width, RenderCaps::truecolor())
     }
 
     /// Returns the plain text of every row.
@@ -344,6 +446,19 @@ mod tests {
             .spans
             .first()
             .and_then(|span| span.style.bg)
+    }
+
+    /// Builds an explicit capability set.
+    fn caps(support: ColorSupport, unicode: bool) -> RenderCaps {
+        RenderCaps { support, unicode }
+    }
+
+    /// Returns the left and right border glyph spans of a row.
+    fn edges(rendered: &Rendered, row: usize) -> (&Span, &Span) {
+        let spans = &rendered.lines[row].spans;
+        let left = spans.first().expect("a bordered row has a left glyph");
+        let right = spans.last().expect("a bordered row has a right glyph");
+        (left, right)
     }
 
     #[test]
@@ -515,7 +630,7 @@ mod tests {
     #[test]
     fn ansi16_renders_without_backgrounds_but_keeps_the_geometry() {
         let card = Card::new("body").title("Heading");
-        let flat = card.render_with(30, ColorSupport::Ansi16);
+        let flat = card.render_with(30, caps(ColorSupport::Ansi16, true));
         for line in &flat.lines {
             assert_eq!(line.width(), 30);
             for span in &line.spans {
@@ -570,6 +685,110 @@ mod tests {
     fn a_card_without_a_title_starts_with_the_content_surface() {
         let out = render(Card::new("body").border(BorderType::Single), 30);
         assert_eq!(row_background(&out, 0), row_background(&out, 1));
+    }
+
+    #[test]
+    fn tall_side_bars_are_quarter_blocks_on_opposite_edges() {
+        // `▊` inks the left three quarters, so only swapping its colors turns
+        // the remaining quarter into the bar - Unicode defines no
+        // right-aligned quarter block.
+        let card = Card::new("body").border(BorderType::Tall);
+        let out = render(card, 30);
+        let (left, right) = edges(&out, 1);
+        assert_eq!(left.content, "▎");
+        assert_eq!(right.content, "▊");
+        assert_eq!(left.style.fg, right.style.bg, "the bar color");
+        assert_eq!(left.style.bg, right.style.fg, "the surface color");
+        assert_ne!(left.style.fg, left.style.bg);
+    }
+
+    #[test]
+    fn tall_corners_are_closed_by_a_full_width_line() {
+        // The horizontal line runs across the corner cells too, and sits on
+        // the inner side of its row, so it touches the side bar of the
+        // adjoining row instead of starting a cell away from it.
+        let card = Card::new("body").border(BorderType::Tall);
+        let lines = plain(&render(card, 20));
+        let last = lines.len() - 1;
+        assert_eq!(lines[0], "▁".repeat(20));
+        assert_eq!(lines[last], "▔".repeat(20));
+    }
+
+    #[test]
+    fn tall_horizontal_rows_carry_no_surface() {
+        // Otherwise a band of card color would sit above the top line, making
+        // the frame look like it starts one row too early.
+        let card = Card::new("body").border(BorderType::Tall);
+        let out = render(card, 30);
+        for span in &out.lines[0].spans {
+            assert_eq!(span.style.bg, None);
+            assert!(span.style.fg.is_some(), "the line stays visible");
+        }
+    }
+
+    #[test]
+    fn tall_keeps_a_background_under_every_body_cell() {
+        // The horizontal rows are deliberately transparent; between them the
+        // surface must still be gapless.
+        let card = Card::new("body")
+            .title("Heading")
+            .footer("footer")
+            .border(BorderType::Tall);
+        let out = render(card, 30);
+        let body = &out.lines[1..out.lines.len() - 1];
+        for line in body {
+            for span in &line.spans {
+                assert!(
+                    span.style.bg.is_some(),
+                    "uncolored span {:?} in {:?}",
+                    span.content,
+                    line.plain()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn tall_side_bars_take_the_surface_of_their_own_region() {
+        // The title bar and the body sit on different surfaces, and the side
+        // glyph of each row has to follow its own row.
+        let card = Card::new("body").title("Heading").border(BorderType::Tall);
+        let out = render(card, 30);
+        assert_ne!(row_background(&out, 1), row_background(&out, 3));
+    }
+
+    #[test]
+    fn tall_degrades_to_thick_without_truecolor() {
+        let card = Card::new("body").border(BorderType::Tall);
+        let out = card.render_with(30, caps(ColorSupport::Ansi16, true));
+        let lines: Vec<String> = out.lines.iter().map(Line::plain).collect();
+        assert!(lines[0].starts_with('┏') && lines[0].ends_with('┓'));
+        assert!(lines[1].starts_with('┃'));
+        assert!(!lines.iter().any(|line| line.contains('▎')));
+        for line in &out.lines {
+            assert_eq!(line.width(), 30, "the geometry is unchanged");
+        }
+    }
+
+    #[test]
+    fn tall_degrades_to_ascii_without_unicode() {
+        let card = Card::new("body").border(BorderType::Tall);
+        let out = card.render_with(30, caps(ColorSupport::TrueColor, false));
+        let lines: Vec<String> = out.lines.iter().map(Line::plain).collect();
+        assert!(lines[0].starts_with('+') && lines[0].ends_with('+'));
+        assert!(lines[1].starts_with('|'));
+    }
+
+    #[test]
+    fn a_non_tall_border_uses_one_glyph_on_both_sides() {
+        // Only a tall border distinguishes its two side glyphs; every other
+        // border type keeps the single `vertical` glyph on both sides.
+        let card = Card::new("body").border(BorderType::Rounded);
+        let out = render(card, 30);
+        let (left, right) = edges(&out, 1);
+        assert_eq!(left.content, "│");
+        assert_eq!(right.content, "│");
+        assert_eq!(left.style, right.style);
     }
 
     #[test]
