@@ -51,17 +51,14 @@ impl SelectionCursor {
         self.follow();
     }
 
-    /// Replaces the item count, keeping the cursor and window in range.
+    /// Replaces the item count and returns to the top of the new list.
     ///
     /// Used by the fuzzy prompt, whose list shrinks and grows as the query
-    /// changes.
-    pub(crate) fn set_len(&mut self, len: usize) {
+    /// changes; every new result set starts at its first match, so there is
+    /// no old cursor position worth carrying over.
+    #[cfg(feature = "fuzzy")]
+    pub(crate) fn refill(&mut self, len: usize) {
         self.len = len;
-        self.jump_to(self.index);
-    }
-
-    /// Resets to the first item, scrolled to the top.
-    pub(crate) fn reset(&mut self) {
         self.index = 0;
         self.offset = 0;
     }
@@ -208,19 +205,11 @@ mod tests {
     }
 
     #[test]
-    fn shrinking_the_list_pulls_the_cursor_back_into_range() {
+    #[cfg(feature = "fuzzy")]
+    fn refilling_returns_to_the_top_of_the_new_list() {
         let mut cursor = cursor(10);
         cursor.jump_to(9);
-        cursor.set_len(4);
-        assert_eq!(cursor.index(), 3);
-        assert_eq!(cursor.window(), 1..4);
-    }
-
-    #[test]
-    fn reset_returns_to_the_top_of_the_list() {
-        let mut cursor = cursor(10);
-        cursor.jump_to(8);
-        cursor.reset();
+        cursor.refill(4);
         assert_eq!(cursor.index(), 0);
         assert_eq!(cursor.window(), 0..3);
     }
