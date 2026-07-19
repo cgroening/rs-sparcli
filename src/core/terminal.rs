@@ -65,11 +65,60 @@ pub fn is_output_tty() -> bool {
     !no_tty_override() && io::stdout().is_terminal()
 }
 
+/// The width standing for "no width limit at all".
+///
+/// Widgets treat it as "lay out at the natural content width": there is no
+/// terminal to fit, so there is nothing to fit into.
+pub const UNCONSTRAINED_WIDTH: u16 = u16::MAX;
+
+/// Returns the width printed output should be laid out for.
+///
+/// At a terminal this is its width. Without one there is no width to respect,
+/// and clipping to an invented default would drop data from a pipe silently,
+/// so layout is left [`UNCONSTRAINED_WIDTH`].
+#[must_use]
+pub fn output_width() -> u16 {
+    if is_output_tty() {
+        term_width()
+    } else {
+        UNCONSTRAINED_WIDTH
+    }
+}
+
+/// Returns `true` if standard error is an interactive terminal.
+pub fn is_error_tty() -> bool {
+    !no_tty_override() && io::stderr().is_terminal()
+}
+
 /// Returns `true` if both standard input and output are terminals.
 pub fn is_input_tty() -> bool {
     !no_tty_override()
         && io::stdin().is_terminal()
         && io::stdout().is_terminal()
+}
+
+/// A standard stream a widget can draw to.
+///
+/// Payload goes to standard output; progress indicators go to standard error,
+/// so a caller can pipe the payload onward without animation frames landing in
+/// it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stream {
+    /// Standard output: the data a caller would consume.
+    Stdout,
+    /// Standard error: progress, notices and everything that is not payload.
+    Stderr,
+}
+
+impl Stream {
+    /// Returns whether this stream is an interactive terminal.
+    #[must_use]
+    pub fn is_tty(self) -> bool {
+        match self {
+            Stream::Stdout => is_output_tty(),
+            Stream::Stderr => is_error_tty(),
+        }
+    }
 }
 
 /// Returns `true` if the environment value is set and not disabled.

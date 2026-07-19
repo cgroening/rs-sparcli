@@ -24,4 +24,5 @@ pub mod tree;
 #[cfg(feature = "pager")]
 pub mod pager;
 
+pub(crate) mod box_draw;
 pub(crate) mod layout;

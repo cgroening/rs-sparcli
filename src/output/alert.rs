@@ -5,7 +5,7 @@ use crate::core::render::{Renderable, Rendered};
 use crate::core::style::Style;
 use crate::core::text::{Line, Span, Text};
 use crate::core::theme::{Theme, theme};
-use crate::output::panel::{BoxOpts, draw_box};
+use crate::output::box_draw::{BoxOpts, draw_box};
 
 /// The severity/kind of an [`Alert`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,20 +132,16 @@ fn with_icon(content: &Text, icon: &str, style: Style) -> Rendered {
 mod tests {
     use super::*;
 
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     #[test]
     fn alert_includes_icon_and_message() {
-        let lines = plain(&Alert::success("done").render(40));
+        let lines = Alert::success("done").render(40).plain_lines();
         assert!(lines.iter().any(|l| l.contains("done")));
         assert!(lines.iter().any(|l| l.contains('✔')));
     }
 
     #[test]
     fn alert_is_bordered() {
-        let lines = plain(&Alert::error("boom").render(40));
+        let lines = Alert::error("boom").render(40).plain_lines();
         assert_eq!(lines.len(), 3);
     }
 }

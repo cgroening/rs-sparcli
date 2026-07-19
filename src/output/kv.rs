@@ -219,14 +219,10 @@ fn push_gap(lines: &mut Vec<Line>, count: u16) {
 mod tests {
     use super::*;
 
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     #[test]
     fn aligns_keys_to_the_widest() {
         let kv = KeyValue::new().add("a", "1").add("name", "2");
-        let lines = plain(&kv.render(40));
+        let lines = kv.render(40).plain_lines();
         assert_eq!(lines[0], "a     1");
         assert_eq!(lines[1], "name  2");
     }
@@ -236,7 +232,7 @@ mod tests {
         let kv = KeyValue::new()
             .wrap_values(true)
             .add("k", "one two three four");
-        let lines = plain(&kv.render(10));
+        let lines = kv.render(10).plain_lines();
         assert!(lines.len() > 1);
     }
 }

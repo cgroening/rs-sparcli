@@ -12,10 +12,26 @@ All notable changes to this project are documented here. The format is based on 
 - `width::wrap_line` and `width::truncate_line` are style-preserving counterparts to `wrap` and `truncate`. They keep each span's style and hyperlink, and a word straddling a span boundary stays whole instead of being wrapped apart.
 - `core::command::split_command` splits a configured command line into an argument vector, honoring single and double quotes. Written by hand rather than pulling in a crate, keeping the dependency set unchanged.
 
+- `Rendered::plain_lines` returns the plain text of each line separately, the counterpart to `plain`. It replaces a test helper that had been copied into nine modules.
+- `terminal::is_error_tty`, `terminal::Stream` and `terminal::output_width` expose which stream a widget draws to and how wide printed output should be laid out.
+- `input::selection::SelectionCursor` is the single implementation of list cursor and scroll-window behaviour, shared by `Select` and `FuzzySelect`. `FuzzySelect` gains the `Home`, `End`, `PageUp` and `PageDown` keys that `Select` already had.
+- `core::command::resolve_from_env` and `core::command::program_and_args` hold the command resolution and argv splitting that `$EDITOR` and `$PAGER` had each implemented separately.
+
+### Changed
+
+- Progress indicators (`ProgressBar`, `Spinner`, `MultiProgress`) now draw on standard error rather than standard output, and only when standard error is itself a terminal. A caller piping standard output onward no longer receives animation frames in the payload. Interactive prompts and `Live` continue to draw on standard output. Mirrors the Python port.
+- `Renderable::print` and `print_to` no longer truncate when standard output is not a terminal. Previously they laid out for an invented 80 columns, so piping a wide table clipped its cells with `…` and lost data without saying so. An explicit `render(max_width)` is unaffected: that width is the caller's decision. Mirrors the Python port.
+- A `Card` without an explicit `width` now lays out at its natural content width when the available width is unconstrained, instead of filling it. "Fill the terminal width" has no meaning without a terminal. Mirrors the Python port.
+- A blank `Pager` command override now falls through to `$PAGER` and the platform default instead of reporting `SparcliError::Config`. Blank counts as unset everywhere, which is how `$EDITOR` already behaved and how a shell treats an empty variable. An unparsable command still reports `SparcliError::Config`. Mirrors the Python port.
+
 ### Fixed
 
 - `$EDITOR`, `$VISUAL` and `$PAGER` are split with `split_command` instead of `split_whitespace`, so an editor or pager path containing spaces (`/Applications/Sublime Text/subl`) no longer breaks into invalid arguments. A command with an unbalanced quote now reports `SparcliError::Config` instead of being silently mangled. Mirrors the Python port.
 - The history state directory is normalized to an absolute path, and an application name that is empty, a dot component, or contains a path separator is rejected instead of being written outside the state directory. Such a history stays in memory. Mirrors the Python port.
+- The temp file handed to `$EDITOR` is created exclusively and with owner-only permissions. Its name is predictable and the temp directory is world-writable, so it could previously be pre-created as a symlink by another local account and redirect the write. It carries whatever was typed into the prompt. The Python port already had this through `tempfile.mkstemp`.
+- The history file is written with owner-only permissions instead of at the default umask. It can hold a token pasted into a prompt. The Python port already had this.
+- `History::load` keeps only the newest `max_entries` lines instead of reading the whole file into memory. The file is foreign input and may have been written by a build with a larger limit. Mirrors the Python port.
+- The cursor hide and show sequences go to the stream being animated instead of always to standard output, so a progress bar on standard error no longer injects control codes into redirected payload.
 
 ## [0.3.0] - 2026-07-11
 

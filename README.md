@@ -158,8 +158,8 @@ The same theme drives both output widgets and input prompts.
 cargo run --example output_gallery --features markup,fuzzy,pager
 cargo run --example output_dynamic --features pager   # spinner/progress/live
 cargo run --example prompts --features fuzzy          # interactive; needs a TTY
-cargo run --example output-readme --features markup   # screenshot collage
-cargo run --example prompt-readme                     # non-interactive prompts
+cargo run --example output_readme --features markup   # screenshot collage
+cargo run --example prompt_readme                     # non-interactive prompts
 ```
 
 ## Documentation

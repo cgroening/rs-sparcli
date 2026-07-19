@@ -215,14 +215,10 @@ fn fallback_ops(old: &[&str], new: &[&str]) -> Vec<Op> {
 mod tests {
     use super::*;
 
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     #[test]
     fn shows_added_and_removed_lines() {
         let diff = Diff::new("a\nb\nc", "a\nB\nc").no_header().context(1);
-        let lines = plain(&diff.render(80));
+        let lines = diff.render(80).plain_lines();
         assert!(lines.iter().any(|l| l == "- b"));
         assert!(lines.iter().any(|l| l == "+ B"));
         assert!(lines.iter().any(|l| l == "  a"));
@@ -231,7 +227,7 @@ mod tests {
     #[test]
     fn identical_input_has_no_changes() {
         let diff = Diff::new("x\ny", "x\ny").no_header();
-        let lines = plain(&diff.render(80));
+        let lines = diff.render(80).plain_lines();
         assert!(lines.iter().all(|l| !l.starts_with('-')));
         assert!(lines.iter().all(|l| !l.starts_with('+')));
     }
@@ -239,7 +235,7 @@ mod tests {
     #[test]
     fn header_shows_labels() {
         let diff = Diff::new("a", "b").labels("before", "after");
-        let lines = plain(&diff.render(80));
+        let lines = diff.render(80).plain_lines();
         assert_eq!(lines[0], "--- before");
         assert_eq!(lines[1], "+++ after");
     }

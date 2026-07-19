@@ -4,18 +4,21 @@
 
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::core::command::split_command;
-use crate::error::{Result, SparcliError};
+use crate::core::command::{program_and_args, resolve_from_env};
+use crate::core::private_file;
+use crate::error::Result;
 
 /// Opens an external editor on `path`, blocking until it exits.
 ///
 /// `command` overrides the editor; otherwise `$VISUAL`, then `$EDITOR`, then a
-/// platform default is used. The command is split with [`split_command`], so a
-/// quoted path containing spaces survives; it is never passed to a shell.
+/// platform default is used. The command is split with
+/// [`split_command`](crate::core::command::split_command), so a quoted path
+/// containing spaces survives; it is never passed to a shell.
 ///
 /// # Errors
 ///
@@ -23,12 +26,7 @@ use crate::error::{Result, SparcliError};
 /// [`SparcliError::Config`] if the resolved command is empty.
 pub fn edit_file(command: Option<&str>, path: &Path) -> Result<()> {
     let resolved = resolve_command(command);
-    let argv = split_command(&resolved).ok_or_else(|| {
-        SparcliError::Config("unparsable editor command".into())
-    })?;
-    let (program, args) = argv
-        .split_first()
-        .ok_or_else(|| SparcliError::Config("empty editor command".into()))?;
+    let (program, args) = program_and_args(&resolved, "editor")?;
     Command::new(program).args(args).arg(path).status()?;
     Ok(())
 }
@@ -47,7 +45,11 @@ pub(crate) fn edit_text(
     suffix: &str,
 ) -> Result<String> {
     let path = temp_path(suffix);
-    fs::write(&path, initial)?;
+    // Created exclusively and owner-only: the temp directory is shared, and
+    // this file carries whatever was typed into the prompt.
+    let mut file = private_file::create_new(&path)?;
+    file.write_all(initial.as_bytes())?;
+    drop(file);
     let result = edit_file(command, &path);
     let contents = fs::read_to_string(&path);
     if let Err(error) = fs::remove_file(&path) {
@@ -57,21 +59,36 @@ pub(crate) fn edit_text(
     Ok(contents?)
 }
 
+/// Edits `initial` in an external editor while raw mode is suspended.
+///
+/// A prompt owns the terminal in raw mode, which an editor cannot share, so
+/// raw mode is left before the handover and re-entered afterwards. It is only
+/// toggled when it was already enabled, so a headless caller never alters the
+/// terminal. A failure to toggle is logged rather than propagated: the edit
+/// itself is what the caller asked for, and its result is still usable.
+///
+/// # Errors
+///
+/// Returns [`SparcliError::Io`] on temp-file or spawn failure.
+pub(crate) fn edit_text_suspended(
+    command: Option<&str>,
+    initial: &str,
+    suffix: &str,
+) -> Result<String> {
+    let was_raw = crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
+    if was_raw && let Err(error) = crossterm::terminal::disable_raw_mode() {
+        log::debug!("could not leave raw mode for the editor: {error}");
+    }
+    let result = edit_text(command, initial, suffix);
+    if was_raw && let Err(error) = crossterm::terminal::enable_raw_mode() {
+        log::debug!("could not re-enter raw mode after the editor: {error}");
+    }
+    result
+}
+
 /// Resolves the editor command from the override or environment.
 fn resolve_command(command: Option<&str>) -> String {
-    if let Some(command) = command
-        && !command.trim().is_empty()
-    {
-        return command.to_string();
-    }
-    for key in ["VISUAL", "EDITOR"] {
-        if let Ok(value) = env::var(key)
-            && !value.trim().is_empty()
-        {
-            return value;
-        }
-    }
-    default_editor().to_string()
+    resolve_from_env(command, &["VISUAL", "EDITOR"], default_editor())
 }
 
 /// The platform's fallback editor.

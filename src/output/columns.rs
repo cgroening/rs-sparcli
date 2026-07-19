@@ -199,17 +199,13 @@ impl Columns {
 mod tests {
     use super::*;
 
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     #[test]
     fn places_blocks_side_by_side() {
         let left = Rendered::new(vec![Line::raw("a"), Line::raw("b")]);
         let right = Rendered::new(vec![Line::raw("x"), Line::raw("y")]);
         let columns =
             Columns::new().add_rendered(left).add_rendered(right).gap(2);
-        let lines = plain(&columns.render(80));
+        let lines = columns.render(80).plain_lines();
         assert_eq!(lines[0], "a  x");
         assert_eq!(lines[1], "b  y");
     }
@@ -220,7 +216,7 @@ mod tests {
         let right = Rendered::new(vec![Line::raw("x")]);
         let columns =
             Columns::new().add_rendered(left).add_rendered(right).gap(1);
-        let lines = plain(&columns.render(80));
+        let lines = columns.render(80).plain_lines();
         assert_eq!(lines[0], "a x");
         assert_eq!(lines[1].trim_end(), "b");
     }
@@ -234,7 +230,7 @@ mod tests {
             .add_rendered(right)
             .gap(3)
             .separator(BorderType::Single);
-        let lines = plain(&columns.render(80));
+        let lines = columns.render(80).plain_lines();
         assert!(lines[0].contains('│'));
     }
 }

@@ -1,8 +1,8 @@
 //! Multiple progress bars updated together in place.
 
+use crate::core::inplace::InPlace;
 use crate::core::render::Rendered;
 use crate::error::Result;
-use crate::output::live::InPlace;
 use crate::output::progress::ProgressBar;
 
 /// The live state of one bar within a [`MultiProgress`].
@@ -30,7 +30,7 @@ impl MultiProgress {
     pub fn new() -> Self {
         Self {
             bars: Vec::new(),
-            inplace: InPlace::new(false),
+            inplace: InPlace::progress(),
             transient: false,
         }
     }

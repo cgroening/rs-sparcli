@@ -10,17 +10,14 @@ use nucleo_matcher::{Config, Matcher, Utf32Str};
 
 use crate::core::render::Rendered;
 use crate::core::style::Style;
-use crate::core::terminal::is_input_tty;
 use crate::core::text::{Line, Span};
 use crate::core::theme::{Theme, theme};
-use crate::error::{Result, SparcliError};
+use crate::error::Result;
 use crate::input::Outcome;
-use crate::input::event::{
-    CrosstermSource, EventSource, InputEvent, KeyCode, KeyPress,
-};
-use crate::input::guard::TerminalGuard;
+use crate::input::event::{EventSource, InputEvent, KeyCode, KeyPress};
 use crate::input::line_edit::LineEditor;
-use crate::input::prompt::{Flow, run_prompt};
+use crate::input::prompt::{Flow, run_interactive, run_prompt};
+use crate::input::selection::SelectionCursor;
 use crate::input::shortcut::{self, Shortcut};
 
 /// Default number of visible result rows.
@@ -30,8 +27,7 @@ const DEFAULT_VISIBLE: usize = 10;
 struct State {
     query: LineEditor,
     filtered: Vec<usize>,
-    cursor: usize,
-    offset: usize,
+    cursor: SelectionCursor,
     checked: Vec<bool>,
 }
 
@@ -148,12 +144,7 @@ impl FuzzySelect {
 
     /// Sets up the terminal and runs the loop.
     fn run_collect(self) -> Result<Outcome<Vec<usize>>> {
-        if !is_input_tty() {
-            return Err(SparcliError::NoTerminal);
-        }
-        let _guard = TerminalGuard::new()?;
-        let mut source = CrosstermSource;
-        self.run_with(&mut source)
+        run_interactive(|source| self.run_with(source))
     }
 
     /// Runs the prompt against any event source (used for tests).
@@ -172,11 +163,15 @@ impl FuzzySelect {
 
     /// Builds the starting state, applying the initial query.
     fn initial_state(&self) -> State {
+        let filtered = self.filter(&self.initial_query);
         State {
             query: LineEditor::new(&self.initial_query, false),
-            filtered: self.filter(&self.initial_query),
-            cursor: 0,
-            offset: 0,
+            cursor: SelectionCursor::new(
+                filtered.len(),
+                self.max_visible,
+                true,
+            ),
+            filtered,
             checked: vec![false; self.options.len()],
         }
     }
@@ -194,8 +189,7 @@ impl FuzzySelect {
         let theme = theme();
         let mut lines =
             vec![query_line(&self.prompt, state, &theme, final_frame)];
-        let end = (state.offset + self.max_visible).min(state.filtered.len());
-        for row in state.offset..end {
+        for row in state.cursor.window() {
             lines.push(self.result_line(state, row, &theme));
         }
         if !final_frame && !self.shortcuts.is_empty() {
@@ -207,7 +201,7 @@ impl FuzzySelect {
     /// Renders one result row (at filtered position `row`).
     fn result_line(&self, state: &State, row: usize, theme: &Theme) -> Line {
         let option_index = state.filtered[row];
-        let is_cursor = row == state.cursor;
+        let is_cursor = row == state.cursor.index();
         let marker = if is_cursor {
             theme.cursor_marker()
         } else {
@@ -252,8 +246,12 @@ impl FuzzySelect {
         match key.code {
             KeyCode::Esc => return Flow::Cancel,
             KeyCode::Enter => return self.submit(state),
-            KeyCode::Up => self.move_cursor(state, -1),
-            KeyCode::Down => self.move_cursor(state, 1),
+            KeyCode::Up => state.cursor.step(-1),
+            KeyCode::Down => state.cursor.step(1),
+            KeyCode::Home => state.cursor.jump_to(0),
+            KeyCode::End => state.cursor.jump_to(usize::MAX),
+            KeyCode::PageUp => state.cursor.page(-1),
+            KeyCode::PageDown => state.cursor.page(1),
             KeyCode::Char(' ') if self.multi => self.toggle(state),
             KeyCode::Backspace => {
                 state.query.backspace();
@@ -276,7 +274,7 @@ impl FuzzySelect {
                 .collect();
             return Flow::Submit(indices);
         }
-        match state.filtered.get(state.cursor) {
+        match state.filtered.get(state.cursor.index()) {
             Some(&index) => Flow::Submit(vec![index]),
             None => Flow::Continue,
         }
@@ -284,7 +282,7 @@ impl FuzzySelect {
 
     /// Toggles the checkbox of the row under the cursor.
     fn toggle(&self, state: &mut State) {
-        if let Some(&index) = state.filtered.get(state.cursor) {
+        if let Some(&index) = state.filtered.get(state.cursor.index()) {
             state.checked[index] = !state.checked[index];
         }
     }
@@ -292,22 +290,8 @@ impl FuzzySelect {
     /// Recomputes the filtered list and resets the cursor to the top.
     fn refilter(&self, state: &mut State) {
         state.filtered = self.filter(&state.query.value());
-        state.cursor = 0;
-        state.offset = 0;
-    }
-
-    /// Moves the cursor within the filtered results, keeping it visible.
-    fn move_cursor(&self, state: &mut State, delta: isize) {
-        if state.filtered.is_empty() {
-            return;
-        }
-        let len = state.filtered.len() as isize;
-        state.cursor = (state.cursor as isize + delta).rem_euclid(len) as usize;
-        if state.cursor < state.offset {
-            state.offset = state.cursor;
-        } else if state.cursor >= state.offset + self.max_visible {
-            state.offset = state.cursor + 1 - self.max_visible;
-        }
+        state.cursor.set_len(state.filtered.len());
+        state.cursor.reset();
     }
 
     /// Filters and ranks options for `query` (original order when empty).
@@ -354,6 +338,44 @@ mod tests {
 
     fn fuzzy() -> FuzzySelect {
         FuzzySelect::new("find").options(["apple", "banana", "cherry", "grape"])
+    }
+
+    #[test]
+    fn end_jumps_to_the_last_result_and_home_back_to_the_first() {
+        let outcome = fuzzy()
+            .run_with(&mut ScriptedSource::keys([KeyCode::End, KeyCode::Enter]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![3]));
+
+        let outcome = fuzzy()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::End,
+                KeyCode::Home,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![0]));
+    }
+
+    #[test]
+    fn a_page_jump_clamps_at_both_ends_of_the_result_list() {
+        // Four options fit inside one page, so PageDown lands on the last row
+        // and PageUp on the first, rather than wrapping around.
+        let outcome = fuzzy()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::PageDown,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![3]));
+
+        let outcome = fuzzy()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::PageUp,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![0]));
     }
 
     #[test]

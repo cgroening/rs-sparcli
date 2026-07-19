@@ -8,6 +8,7 @@ use crate::core::style::Style;
 use crate::core::text::{Line, Span};
 use crate::core::theme::theme;
 use crate::input::event::{KeyCode, KeyPress};
+use crate::input::prompt::Flow;
 
 /// A bound shortcut: a key, a caller-defined id and a footer label.
 #[derive(Debug, Clone)]
@@ -34,6 +35,31 @@ impl Shortcut {
 /// Returns the id of the shortcut matching `key`, if any.
 pub fn find(key: KeyPress, shortcuts: &[Shortcut]) -> Option<i32> {
     shortcuts.iter().find(|s| s.key == key).map(|s| s.id)
+}
+
+/// Handles the keys the shortcut layer owns, before a prompt sees them.
+///
+/// Every prompt that accepts shortcuts shares the same three rules: while the
+/// help overlay is up any key dismisses it, `?` opens it when there is
+/// something to show, and a bound key fires its action. Returns `None` when
+/// the key belongs to the prompt itself, so a caller reads as
+/// `if let Some(flow) = intercept(...) { return flow; }`.
+///
+/// `showing_help` is the caller's overlay flag and is updated in place.
+pub(crate) fn intercept<T>(
+    key: KeyPress,
+    shortcuts: &[Shortcut],
+    showing_help: &mut bool,
+) -> Option<Flow<T>> {
+    if *showing_help {
+        *showing_help = false;
+        return Some(Flow::Continue);
+    }
+    if key.code == KeyCode::Char('?') && !shortcuts.is_empty() {
+        *showing_help = true;
+        return Some(Flow::Continue);
+    }
+    find(key, shortcuts).map(Flow::Shortcut)
 }
 
 /// Builds a footer hint line: `key label · key label · …`.

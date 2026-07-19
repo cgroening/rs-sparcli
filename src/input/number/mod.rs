@@ -4,16 +4,14 @@ mod calc;
 
 use crate::core::render::Rendered;
 use crate::core::style::Style;
-use crate::core::terminal::is_input_tty;
 use crate::core::theme::theme;
-use crate::error::{Result, SparcliError};
+use crate::error::Result;
 use crate::input::Outcome;
-use crate::input::event::{CrosstermSource, EventSource, InputEvent, KeyPress};
+use crate::input::event::{EventSource, InputEvent, KeyPress};
 use crate::input::field::{error_line, field_line, value_line};
-use crate::input::guard::TerminalGuard;
 use crate::input::line_edit::LineEditor;
 use crate::input::number::calc::{CalcError, eval, parse_number};
-use crate::input::prompt::{Flow, run_prompt};
+use crate::input::prompt::{Flow, run_interactive, run_prompt};
 
 /// Mutable state of a running number prompt.
 struct State {
@@ -104,12 +102,7 @@ impl NumberInput {
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<f64>> {
-        if !is_input_tty() {
-            return Err(SparcliError::NoTerminal);
-        }
-        let _guard = TerminalGuard::new()?;
-        let mut source = CrosstermSource;
-        self.run_with(&mut source)
+        run_interactive(|source| self.run_with(source))
     }
 
     /// Runs the prompt against any event source (used for tests).

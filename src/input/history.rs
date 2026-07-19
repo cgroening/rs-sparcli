@@ -4,6 +4,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::core::private_file;
 use crate::error::Result;
 
 /// Default maximum number of retained entries.
@@ -113,7 +114,13 @@ impl History {
             return Ok(());
         }
         let contents = fs::read_to_string(path)?;
-        self.entries = contents.lines().map(str::to_string).collect();
+        // Keep only the newest `max` lines. The file is foreign input - it may
+        // have been written by an older build with a larger limit, or grown
+        // unbounded - and `max` is what the caller asked to hold in memory.
+        let lines: Vec<&str> = contents.lines().collect();
+        let start = lines.len().saturating_sub(self.max);
+        self.entries =
+            lines[start..].iter().map(|s| (*s).to_string()).collect();
         Ok(())
     }
 
@@ -131,8 +138,9 @@ impl History {
         }
         // Write to a sibling temp file and rename it over the target so a
         // crash or a concurrent writer never leaves a half-written file.
+        // Owner-only, because history holds whatever was typed at a prompt.
         let temp = path.with_extension(format!("tmp.{}", std::process::id()));
-        fs::write(&temp, self.entries.join("\n"))?;
+        private_file::write(&temp, &self.entries.join("\n"))?;
         if let Err(error) = fs::rename(&temp, path) {
             let _ = fs::remove_file(&temp);
             return Err(error.into());
@@ -210,6 +218,47 @@ mod tests {
         history.add("b");
         history.add("c");
         assert_eq!(history.entries(), &["b", "c"]);
+    }
+
+    #[test]
+    fn load_keeps_only_the_newest_max_entries() {
+        // The file is foreign input: an older build or another tool may have
+        // left far more lines in it than this history is configured to hold.
+        let dir = std::env::temp_dir()
+            .join(format!("sparcli_hist_cap_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("history");
+        fs::write(&path, "a\nb\nc\nd\ne").unwrap();
+
+        let mut history = History::new().max_entries(2);
+        history.path = Some(path);
+        history.load().unwrap();
+        assert_eq!(history.entries(), &["d", "e"]);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_saved_history_is_not_readable_by_other_accounts() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir()
+            .join(format!("sparcli_hist_perm_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let mut history = History::new();
+        history.path = Some(dir.join("history"));
+        history.add("a token someone pasted into a prompt");
+        history.save().unwrap();
+
+        let mode = fs::metadata(dir.join("history"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o077, 0, "group and other must have no access");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

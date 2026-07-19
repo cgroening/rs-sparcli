@@ -8,16 +8,12 @@ pub use self::date::Date;
 
 use crate::core::render::Rendered;
 use crate::core::style::Style;
-use crate::core::terminal::is_input_tty;
 use crate::core::text::{Line, Span};
 use crate::core::theme::{Theme, theme};
-use crate::error::{Result, SparcliError};
+use crate::error::Result;
 use crate::input::Outcome;
-use crate::input::event::{
-    CrosstermSource, EventSource, InputEvent, KeyCode, KeyPress,
-};
-use crate::input::guard::TerminalGuard;
-use crate::input::prompt::{Flow, run_prompt};
+use crate::input::event::{EventSource, InputEvent, KeyCode, KeyPress};
+use crate::input::prompt::{Flow, run_interactive, run_prompt};
 use crate::input::shortcut::{self, Shortcut};
 
 /// Mutable state of a running date picker.
@@ -94,12 +90,7 @@ impl DatePicker {
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<Date>> {
-        if !is_input_tty() {
-            return Err(SparcliError::NoTerminal);
-        }
-        let _guard = TerminalGuard::new()?;
-        let mut source = CrosstermSource;
-        self.run_with(&mut source)
+        run_interactive(|source| self.run_with(source))
     }
 
     /// Runs the picker against any event source (used for tests).
@@ -154,16 +145,10 @@ impl DatePicker {
         let InputEvent::Key(key) = event else {
             return Flow::Continue;
         };
-        if state.help {
-            state.help = false;
-            return Flow::Continue;
-        }
-        if key.code == KeyCode::Char('?') && !self.shortcuts.is_empty() {
-            state.help = true;
-            return Flow::Continue;
-        }
-        if let Some(id) = shortcut::find(key, &self.shortcuts) {
-            return Flow::Shortcut(id);
+        if let Some(flow) =
+            shortcut::intercept(key, &self.shortcuts, &mut state.help)
+        {
+            return flow;
         }
         if matches!(key.code, KeyCode::Esc) {
             return Flow::Cancel;

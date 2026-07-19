@@ -2,7 +2,7 @@
 //! a titled hero panel, a three-column dashboard (table | list+tree+rules |
 //! key-value+badges+columns) and a progress bar, in the same colors.
 //!
-//! `cargo run --example output-readme --features markup`
+//! `cargo run --example output_readme --features markup`
 
 use sparcli::prelude::*;
 use sparcli::{

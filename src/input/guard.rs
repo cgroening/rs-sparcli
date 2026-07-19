@@ -9,6 +9,7 @@ use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 
 use crate::core::cursor;
+use crate::core::terminal::Stream;
 use crate::error::Result;
 
 /// Restores raw mode and bracketed paste when dropped.
@@ -26,7 +27,7 @@ impl TerminalGuard {
         enable_raw_mode()?;
         let bracketed_paste =
             execute!(std::io::stdout(), EnableBracketedPaste).is_ok();
-        cursor::hide();
+        cursor::hide(Stream::Stdout);
         Ok(Self { bracketed_paste })
     }
 }

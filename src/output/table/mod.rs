@@ -8,154 +8,18 @@
 //! `wrap` columns reflow first, then the rest truncate; `fixed_width` columns
 //! never shrink and no column falls below its `min_width`.
 
+mod column;
 mod plan;
 mod render;
 
+pub use self::column::{Cell, Column};
+
+use self::column::Row;
 use crate::core::border::BorderType;
-use crate::core::geometry::Align;
 use crate::core::render::{Renderable, Rendered};
 use crate::core::style::Style;
 use crate::core::text::Text;
 use crate::core::theme::theme;
-
-/// A single table column definition.
-pub struct Column {
-    header: Text,
-    align: Align,
-    min_width: usize,
-    max_width: Option<usize>,
-    fixed_width: Option<usize>,
-    wrap: bool,
-}
-
-impl Column {
-    /// Creates a column with the given header.
-    pub fn new(header: impl Into<Text>) -> Self {
-        Self {
-            header: header.into(),
-            align: Align::Left,
-            min_width: 0,
-            max_width: None,
-            fixed_width: None,
-            wrap: false,
-        }
-    }
-
-    /// Sets the column alignment.
-    #[must_use]
-    pub fn align(mut self, align: Align) -> Self {
-        self.align = align;
-        self
-    }
-
-    /// Sets the minimum column width.
-    #[must_use]
-    pub fn min_width(mut self, width: usize) -> Self {
-        self.min_width = width;
-        self
-    }
-
-    /// Sets the maximum column width (content is wrapped or truncated).
-    #[must_use]
-    pub fn max_width(mut self, width: usize) -> Self {
-        self.max_width = Some(width);
-        self
-    }
-
-    /// Sets a fixed column width.
-    #[must_use]
-    pub fn fixed_width(mut self, width: usize) -> Self {
-        self.fixed_width = Some(width);
-        self
-    }
-
-    /// Enables word wrapping instead of truncation.
-    #[must_use]
-    pub fn wrap(mut self) -> Self {
-        self.wrap = true;
-        self
-    }
-}
-
-impl From<&str> for Column {
-    fn from(value: &str) -> Self {
-        Column::new(value)
-    }
-}
-
-impl From<String> for Column {
-    fn from(value: String) -> Self {
-        Column::new(value)
-    }
-}
-
-/// A single table cell.
-pub struct Cell {
-    content: Text,
-    align: Option<Align>,
-    colspan: usize,
-    rowspan: usize,
-}
-
-impl Cell {
-    /// Creates a cell from content.
-    pub fn new(content: impl Into<Text>) -> Self {
-        Self {
-            content: content.into(),
-            align: None,
-            colspan: 1,
-            rowspan: 1,
-        }
-    }
-
-    /// Overrides the cell alignment.
-    #[must_use]
-    pub fn align(mut self, align: Align) -> Self {
-        self.align = Some(align);
-        self
-    }
-
-    /// Spans this cell across `columns` columns.
-    #[must_use]
-    pub fn colspan(mut self, columns: usize) -> Self {
-        self.colspan = columns.max(1);
-        self
-    }
-
-    /// Spans this cell across `rows` rows.
-    ///
-    /// Cells in the rows below skip the spanned column(s); content sits in the
-    /// top row. Best paired with the default (no row separators).
-    #[must_use]
-    pub fn rowspan(mut self, rows: usize) -> Self {
-        self.rowspan = rows.max(1);
-        self
-    }
-}
-
-impl From<&str> for Cell {
-    fn from(value: &str) -> Self {
-        Cell::new(value)
-    }
-}
-
-impl From<String> for Cell {
-    fn from(value: String) -> Self {
-        Cell::new(value)
-    }
-}
-
-impl From<Text> for Cell {
-    fn from(value: Text) -> Self {
-        Cell::new(value)
-    }
-}
-
-/// A table row of cells.
-struct Row {
-    cells: Vec<Cell>,
-    footer: bool,
-}
 
 /// A data table.
 ///
@@ -346,11 +210,7 @@ impl Renderable for Table {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::text::Line;
-
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
+    use crate::core::geometry::Align;
 
     #[test]
     fn renders_header_and_rows_with_borders() {
@@ -358,7 +218,7 @@ mod tests {
             .columns(["A", "B"])
             .row(["1", "2"])
             .border(BorderType::Single);
-        let lines = plain(&table.render(80));
+        let lines = table.render(80).plain_lines();
         assert!(lines[0].starts_with('┌'));
         assert!(lines[1].contains('A') && lines[1].contains('B'));
         assert!(lines[2].starts_with('├'));
@@ -373,7 +233,7 @@ mod tests {
             .column(Column::new("").align(Align::Right))
             .row(["7"])
             .border(BorderType::Ascii);
-        let lines = plain(&table.render(80));
+        let lines = table.render(80).plain_lines();
         // Body row: |<pad>7<pad>| with right alignment (single col).
         assert!(lines.iter().any(|l| l.contains('7')));
     }
@@ -385,7 +245,7 @@ mod tests {
             .column(Column::new("").max_width(4))
             .row(["abcdefgh"])
             .border(BorderType::Single);
-        let lines = plain(&table.render(80));
+        let lines = table.render(80).plain_lines();
         assert!(lines.iter().any(|l| l.contains('…')));
     }
 
@@ -397,7 +257,7 @@ mod tests {
             .row([Cell::new("x").rowspan(2), Cell::new("1")])
             .row(["2"])
             .border(BorderType::Single);
-        let lines = plain(&table.render(80));
+        let lines = table.render(80).plain_lines();
         // Top span row carries both the spanning cell and the first value.
         assert!(lines.iter().any(|l| l.contains('x') && l.contains('1')));
         // The continuation row shows the next value but not the spanned cell.
@@ -411,13 +271,14 @@ mod tests {
             .columns(["A", "B"])
             .row([Cell::new("wide").colspan(2)])
             .border(BorderType::Single);
-        let lines = plain(&table.render(80));
+        let lines = table.render(80).plain_lines();
         assert!(lines.iter().any(|l| l.contains("wide")));
     }
 
     /// The widest rendered line, i.e. the table's outer width.
     fn outer_width(rendered: &Rendered) -> usize {
-        plain(rendered)
+        rendered
+            .plain_lines()
             .iter()
             .map(|line| crate::width::visible_width(line))
             .max()
@@ -432,7 +293,10 @@ mod tests {
             .border(BorderType::Single);
         // A table that fits must render the same at any generous width, so the
         // fitting pass never touches the common case.
-        assert_eq!(plain(&table.render(80)), plain(&table.render(1000)));
+        assert_eq!(
+            table.render(80).plain_lines(),
+            table.render(1000).plain_lines()
+        );
     }
 
     #[test]
@@ -444,7 +308,7 @@ mod tests {
             .row(["aaaaaaaaaaaaaaaaaaaa", "12345"])
             .border(BorderType::Single);
         let rendered = table.render(20);
-        let lines = plain(&rendered);
+        let lines = rendered.plain_lines();
         // The numeric column keeps its content; the wrap column reflows onto a
         // second physical line instead of losing text.
         assert!(lines.iter().any(|l| l.contains("12345")));
@@ -461,7 +325,7 @@ mod tests {
             .row(["abcdefghijklmnop", "xy"])
             .border(BorderType::Single);
         let rendered = table.render(16);
-        let lines = plain(&rendered);
+        let lines = rendered.plain_lines();
         // The narrow column survives; the wide one is truncated with an ellipsis.
         assert!(lines.iter().any(|l| l.contains("xy")));
         assert!(lines.iter().any(|l| l.contains('…')));
@@ -477,7 +341,7 @@ mod tests {
             .row(["FIXEDVAL", "aaaaaaaaaaaaaaaa"])
             .border(BorderType::Single);
         let rendered = table.render(20);
-        let lines = plain(&rendered);
+        let lines = rendered.plain_lines();
         // The fixed column keeps its full 8-character value; the flexible one
         // absorbs the whole deficit.
         assert!(lines.iter().any(|l| l.contains("FIXEDVAL")));

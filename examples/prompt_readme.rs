@@ -2,7 +2,7 @@
 //! slim form: a titled hero panel and a balanced multi-column dashboard of
 //! statically rendered prompt frames (no boxes/hints, default theme).
 //!
-//! `cargo run --example prompt-readme`
+//! `cargo run --example prompt_readme`
 //!
 //! Each prompt's frame is produced by its `frame()` method (no TTY, no
 //! interaction); columns are stacked with `vstack` and joined with `Columns`.

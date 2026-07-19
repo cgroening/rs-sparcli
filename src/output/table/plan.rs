@@ -200,3 +200,167 @@ fn eligible(column: &Column, pass: ShrinkPass) -> bool {
 fn floor(column: &Column) -> usize {
     column.min_width.max(1)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clamp_width_prefers_a_fixed_width_over_everything() {
+        let column = Column::new("h").fixed_width(5).min_width(20).max_width(2);
+        assert_eq!(clamp_width(100, &column), 5);
+    }
+
+    #[test]
+    fn clamp_width_applies_the_min_then_the_max() {
+        let column = Column::new("h").min_width(4).max_width(8);
+        assert_eq!(clamp_width(1, &column), 4, "raised to the minimum");
+        assert_eq!(clamp_width(6, &column), 6, "left alone in between");
+        assert_eq!(clamp_width(99, &column), 8, "capped at the maximum");
+    }
+
+    #[test]
+    fn clamp_width_never_returns_zero() {
+        // A zero-width column would render as an unusable sliver.
+        assert_eq!(clamp_width(0, &Column::new("")), 1);
+        assert_eq!(clamp_width(0, &Column::new("").max_width(0)), 1);
+    }
+
+    #[test]
+    fn floor_is_at_least_one_column() {
+        assert_eq!(floor(&Column::new("h")), 1);
+        assert_eq!(floor(&Column::new("h").min_width(3)), 3);
+    }
+
+    #[test]
+    fn a_fixed_column_is_eligible_for_no_shrink_pass() {
+        let fixed = Column::new("h").fixed_width(4);
+        assert!(!eligible(&fixed, ShrinkPass::Wrapping));
+        assert!(!eligible(&fixed, ShrinkPass::NonWrapping));
+    }
+
+    #[test]
+    fn each_shrink_pass_claims_its_own_columns() {
+        let wrapping = Column::new("h").wrap();
+        let plain = Column::new("h");
+        assert!(eligible(&wrapping, ShrinkPass::Wrapping));
+        assert!(!eligible(&wrapping, ShrinkPass::NonWrapping));
+        assert!(!eligible(&plain, ShrinkPass::Wrapping));
+        assert!(eligible(&plain, ShrinkPass::NonWrapping));
+    }
+
+    #[test]
+    fn widest_shrinkable_breaks_ties_towards_the_lower_index() {
+        // Determinism matters: the same table must always shrink the same way.
+        let table = Table::new().columns(["a", "b"]);
+        let widths = [7, 7];
+        let picked =
+            widest_shrinkable(&table, &widths, ShrinkPass::NonWrapping);
+        assert_eq!(picked, Some(0));
+    }
+
+    #[test]
+    fn widest_shrinkable_skips_columns_already_at_their_floor() {
+        let table = Table::new()
+            .column(Column::new("a").min_width(5))
+            .column(Column::new("b"));
+        let widths = [5, 3];
+        let picked =
+            widest_shrinkable(&table, &widths, ShrinkPass::NonWrapping);
+        assert_eq!(picked, Some(1), "the wider column is at its floor");
+    }
+
+    #[test]
+    fn widest_shrinkable_gives_up_when_nothing_has_slack() {
+        let table = Table::new().column(Column::new("a").fixed_width(4));
+        let widths = [4];
+        assert_eq!(
+            widest_shrinkable(&table, &widths, ShrinkPass::NonWrapping),
+            None
+        );
+    }
+
+    #[test]
+    fn shrink_reports_the_width_it_could_not_recover() {
+        // Both columns bottom out at 1, so only 8 of the 20 can be given up.
+        let table = Table::new().columns(["a", "b"]);
+        let mut widths = [5, 5];
+        let left = shrink(&table, &mut widths, 20, ShrinkPass::NonWrapping);
+        assert_eq!(widths, [1, 1]);
+        assert_eq!(left, 12);
+    }
+
+    #[test]
+    fn a_table_that_already_fits_is_left_untouched() {
+        let table = Table::new().columns(["a", "b"]);
+        let mut widths = [5, 5];
+        fit_to_width(&table, &mut widths, 200);
+        assert_eq!(widths, [5, 5]);
+    }
+
+    #[test]
+    fn wrapping_columns_give_up_width_before_truncating_ones() {
+        // A wrapping column only reflows, so it loses width first; the plain
+        // column keeps its content intact for as long as possible.
+        let table = Table::new()
+            .column(Column::new("a").wrap())
+            .column(Column::new("b"));
+        let mut widths = [10, 10];
+        // Overhead for two columns at pad 1 is 2*(2*1+1)+1 = 7.
+        fit_to_width(&table, &mut widths, 7 + 16);
+        assert_eq!(widths, [6, 10]);
+    }
+
+    #[test]
+    fn a_fixed_column_keeps_its_width_while_others_shrink() {
+        let table = Table::new()
+            .column(Column::new("a").fixed_width(8))
+            .column(Column::new("b"));
+        let mut widths = [8, 10];
+        fit_to_width(&table, &mut widths, 7 + 14);
+        assert_eq!(widths, [8, 6]);
+    }
+
+    #[test]
+    fn a_table_too_narrow_even_at_the_floors_overflows_rather_than_vanish() {
+        let table = Table::new()
+            .column(Column::new("a").min_width(6))
+            .column(Column::new("b").min_width(6));
+        let mut widths = [6, 6];
+        fit_to_width(&table, &mut widths, 10);
+        assert_eq!(widths, [6, 6], "floors win over the budget");
+    }
+
+    #[test]
+    fn build_plan_fills_every_column_of_every_row() {
+        let table = Table::new().columns(["a", "b", "c"]).row(["1"]);
+        let plan = build_plan(&table.rows, 3);
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].cells.len(), 3, "short rows are padded out");
+        assert!(plan[0].cells[0].cell.is_some());
+        assert!(plan[0].cells[1].cell.is_none());
+    }
+
+    #[test]
+    fn build_plan_honors_colspan_and_clamps_it_to_the_grid() {
+        let table = Table::new()
+            .columns(["a", "b", "c"])
+            .row([Cell::new("wide").colspan(9)]);
+        let plan = build_plan(&table.rows, 3);
+        assert_eq!(plan[0].cells.len(), 1);
+        assert_eq!(plan[0].cells[0].colspan, 3, "clamped to the column count");
+    }
+
+    #[test]
+    fn build_plan_reserves_the_spanned_slots_of_a_rowspan() {
+        let table = Table::new()
+            .columns(["a", "b"])
+            .row([Cell::new("tall").rowspan(2), Cell::new("x")])
+            .row(["y"]);
+        let plan = build_plan(&table.rows, 2);
+        // The second row's first column is occupied by the rowspan above, so
+        // "y" is pushed into the second column.
+        assert!(plan[1].cells[0].cell.is_none());
+        assert!(plan[1].cells[1].cell.is_some());
+    }
+}

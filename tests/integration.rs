@@ -6,7 +6,10 @@
 
 use sparcli::prelude::*;
 use sparcli::width::strip_ansi;
-use sparcli::{Alert, Card, List, Marker, Panel, Table, Tree, TreeNode};
+use sparcli::{
+    Alert, Badge, Card, Columns, Diff, KeyValue, List, Marker, Panel, Rule,
+    Table, Text, Tree, TreeNode,
+};
 
 /// Renders a widget and returns its visible text (no ANSI escapes).
 fn visible(widget: &impl Renderable) -> String {
@@ -88,4 +91,65 @@ fn tree_renders_branches() {
     assert!(output.contains("root"));
     assert!(output.contains("x"));
     assert!(output.contains("y"));
+}
+
+#[test]
+fn key_value_pairs_align_their_values() {
+    let pairs = KeyValue::new().add("host", "web-1").add("port", "80");
+    let text = visible(&pairs);
+    assert!(text.contains("host"));
+    assert!(text.contains("web-1"));
+    assert!(text.contains("port"));
+}
+
+#[test]
+fn diff_marks_added_and_removed_lines() {
+    let text = visible(&Diff::new("one\ntwo", "one\nthree"));
+    assert!(text.contains("two"), "the removed line is shown");
+    assert!(text.contains("three"), "the added line is shown");
+}
+
+#[test]
+fn columns_lay_items_out_side_by_side() {
+    let columns = Columns::new()
+        .add(&Text::raw("alpha"), 10)
+        .add(&Text::raw("beta"), 10)
+        .add(&Text::raw("gamma"), 10);
+    let text = visible(&columns);
+    for item in ["alpha", "beta", "gamma"] {
+        assert!(text.contains(item), "{item} is missing");
+    }
+}
+
+#[test]
+fn a_rule_fills_the_width_and_carries_its_label() {
+    let text = visible(&Rule::with_title("Section"));
+    assert!(text.contains("Section"));
+}
+
+#[test]
+fn a_badge_renders_its_label() {
+    assert!(visible(&Badge::new("NEW")).contains("NEW"));
+}
+
+#[test]
+fn printing_without_a_terminal_does_not_truncate() {
+    // Section 1.6: piped output has no width to fit, so a wide table keeps
+    // every column instead of clipping to an invented 80 and losing data.
+    let wide = "w".repeat(200);
+    let table = Table::new().columns(["id", "value"]).row(["1", &wide]);
+    let text = visible(&table);
+    assert!(text.contains(&wide), "the full value survives the pipe");
+    assert!(!text.contains('…'), "nothing was clipped");
+}
+
+#[test]
+fn an_explicit_render_width_still_truncates() {
+    // The no-truncation rule applies to print/print_to, which resolve the
+    // width themselves. An explicit width is the caller's decision and is
+    // still honoured.
+    let wide = "w".repeat(200);
+    let table = Table::new().columns(["id", "value"]).row(["1", &wide]);
+    let text = strip_ansi(&table.render(40).plain());
+    assert!(text.contains('…'), "an explicit width clips as before");
 }

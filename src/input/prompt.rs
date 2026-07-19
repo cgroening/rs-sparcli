@@ -4,11 +4,37 @@
 //! and an event handler. Drawing goes through the shared in-place engine, so
 //! prompts behave correctly on terminals and become no-ops off-terminal.
 
+use crate::core::inplace::InPlace;
 use crate::core::render::Rendered;
-use crate::error::Result;
+use crate::core::terminal::is_input_tty;
+use crate::error::{Result, SparcliError};
 use crate::input::Outcome;
-use crate::input::event::{EventSource, InputEvent};
-use crate::output::live::InPlace;
+use crate::input::event::{CrosstermSource, EventSource, InputEvent};
+use crate::input::guard::TerminalGuard;
+
+/// Claims the real terminal and runs `body` against it.
+///
+/// Every prompt's public `run` needs the same three steps before its loop can
+/// start: refuse to prompt without a terminal, put it into raw mode under an
+/// RAII guard, and hand the loop a [`CrosstermSource`]. The guard is dropped
+/// once `body` returns, so the terminal is restored on success, error and
+/// panic alike.
+///
+/// # Errors
+///
+/// Returns [`SparcliError::NoTerminal`] without an interactive terminal, or
+/// [`SparcliError::Io`] if the terminal cannot be reconfigured.
+pub(crate) fn run_interactive<T, F>(body: F) -> Result<Outcome<T>>
+where
+    F: FnOnce(&mut CrosstermSource) -> Result<Outcome<T>>,
+{
+    if !is_input_tty() {
+        return Err(SparcliError::NoTerminal);
+    }
+    let _guard = TerminalGuard::new()?;
+    let mut source = CrosstermSource;
+    body(&mut source)
+}
 
 /// What a prompt's event handler decides after each event.
 pub(crate) enum Flow<T> {
@@ -42,7 +68,7 @@ where
     H: FnMut(&mut S, InputEvent) -> Flow<T>,
 {
     let mut inplace = if source.is_interactive() {
-        InPlace::new(false)
+        InPlace::for_terminal()
     } else {
         InPlace::silent()
     };
