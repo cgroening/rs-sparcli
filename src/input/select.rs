@@ -2,16 +2,13 @@
 
 use crate::core::render::Rendered;
 use crate::core::style::Style;
-use crate::core::terminal::is_input_tty;
 use crate::core::text::{Line, Span};
 use crate::core::theme::{Theme, theme};
-use crate::error::{Result, SparcliError};
+use crate::error::Result;
 use crate::input::Outcome;
-use crate::input::event::{
-    CrosstermSource, EventSource, InputEvent, KeyCode, KeyPress,
-};
-use crate::input::guard::TerminalGuard;
-use crate::input::prompt::{Flow, run_prompt};
+use crate::input::event::{EventSource, InputEvent, KeyCode, KeyPress};
+use crate::input::prompt::{Flow, run_interactive, run_prompt};
+use crate::input::selection::SelectionCursor;
 use crate::input::shortcut::{self, Shortcut};
 
 /// Default number of visible rows.
@@ -19,9 +16,8 @@ const DEFAULT_VISIBLE: usize = 10;
 
 /// Mutable state of a running select prompt.
 struct State {
-    cursor: usize,
+    cursor: SelectionCursor,
     checked: Vec<bool>,
-    offset: usize,
     help: bool,
 }
 
@@ -158,12 +154,7 @@ impl Select {
 
     /// Sets up the terminal and runs the loop.
     fn run_collect(self) -> Result<Outcome<Vec<usize>>> {
-        if !is_input_tty() {
-            return Err(SparcliError::NoTerminal);
-        }
-        let _guard = TerminalGuard::new()?;
-        let mut source = CrosstermSource;
-        self.run_with(&mut source)
+        run_interactive(|source| self.run_with(source))
     }
 
     /// Runs the prompt against any event source (used for tests).
@@ -186,18 +177,18 @@ impl Select {
     /// Builds the starting state, honoring the initial cursor and checks.
     fn initial_state(&self) -> State {
         let len = self.options.len();
-        let cursor = self.initial_cursor.min(len.saturating_sub(1));
         let mut checked = vec![false; len];
         for &index in &self.initial_checked {
             if index < len {
                 checked[index] = true;
             }
         }
-        let offset = cursor.saturating_sub(self.max_visible.saturating_sub(1));
+        let mut cursor =
+            SelectionCursor::new(len, self.max_visible, self.cycle);
+        cursor.jump_to(self.initial_cursor);
         State {
             cursor,
             checked,
-            offset,
             help: false,
         }
     }
@@ -215,8 +206,7 @@ impl Select {
             return Rendered::new(shortcut::help_overlay(&self.shortcuts));
         }
         let mut lines = vec![Line::styled(self.prompt.clone(), theme.title)];
-        let end = (state.offset + self.max_visible).min(self.options.len());
-        for index in state.offset..end {
+        for index in state.cursor.window() {
             lines.push(self.option_line(state, index, &theme));
         }
         if !self.shortcuts.is_empty() {
@@ -227,7 +217,7 @@ impl Select {
 
     /// Renders one option row.
     fn option_line(&self, state: &State, index: usize, theme: &Theme) -> Line {
-        let is_cursor = index == state.cursor;
+        let is_cursor = index == state.cursor.index();
         let marker = if is_cursor {
             theme.cursor_marker()
         } else {
@@ -261,32 +251,23 @@ impl Select {
 
     /// Handles a single key press.
     fn handle_key(&self, state: &mut State, key: KeyPress) -> Flow<Vec<usize>> {
-        if state.help {
-            state.help = false;
-            return Flow::Continue;
-        }
-        if key.code == KeyCode::Char('?') && !self.shortcuts.is_empty() {
-            state.help = true;
-            return Flow::Continue;
-        }
-        if let Some(id) = shortcut::find(key, &self.shortcuts) {
-            return Flow::Shortcut(id);
+        if let Some(flow) =
+            shortcut::intercept(key, &self.shortcuts, &mut state.help)
+        {
+            return flow;
         }
         match key.code {
             KeyCode::Esc => return Flow::Cancel,
             KeyCode::Enter => return Flow::Submit(self.collect(state)),
-            KeyCode::Up | KeyCode::Char('k') => self.move_cursor(state, -1),
-            KeyCode::Down | KeyCode::Char('j') => self.move_cursor(state, 1),
-            KeyCode::Home => self.set_cursor(state, 0),
-            KeyCode::End => self.set_cursor(state, self.options.len() - 1),
-            KeyCode::PageUp => {
-                self.move_cursor(state, -(self.max_visible as isize));
-            }
-            KeyCode::PageDown => {
-                self.move_cursor(state, self.max_visible as isize);
-            }
+            KeyCode::Up | KeyCode::Char('k') => state.cursor.step(-1),
+            KeyCode::Down | KeyCode::Char('j') => state.cursor.step(1),
+            KeyCode::Home => state.cursor.jump_to(0),
+            KeyCode::End => state.cursor.jump_to(usize::MAX),
+            KeyCode::PageUp => state.cursor.page(-1),
+            KeyCode::PageDown => state.cursor.page(1),
             KeyCode::Char(' ') if self.multi => {
-                state.checked[state.cursor] = !state.checked[state.cursor];
+                let index = state.cursor.index();
+                state.checked[index] = !state.checked[index];
             }
             _ => {}
         }
@@ -300,28 +281,7 @@ impl Select {
                 .filter(|&i| state.checked[i])
                 .collect()
         } else {
-            vec![state.cursor]
-        }
-    }
-
-    /// Moves the cursor by `delta`, cycling or clamping per config.
-    fn move_cursor(&self, state: &mut State, delta: isize) {
-        let len = self.options.len() as isize;
-        let next = if self.cycle {
-            (state.cursor as isize + delta).rem_euclid(len)
-        } else {
-            (state.cursor as isize + delta).clamp(0, len - 1)
-        };
-        self.set_cursor(state, next as usize);
-    }
-
-    /// Sets the cursor and scrolls so it stays visible.
-    fn set_cursor(&self, state: &mut State, index: usize) {
-        state.cursor = index;
-        if index < state.offset {
-            state.offset = index;
-        } else if index >= state.offset + self.max_visible {
-            state.offset = index + 1 - self.max_visible;
+            vec![state.cursor.index()]
         }
     }
 }
@@ -333,6 +293,44 @@ mod tests {
 
     fn select() -> Select {
         Select::new("pick").options(["a", "b", "c"])
+    }
+
+    #[test]
+    fn a_page_jump_clamps_even_though_stepping_cycles() {
+        // Arrow keys wrap, but a page jump from the top must not land on the
+        // bottom of the list - that reads as a lost position, not navigation.
+        let outcome = select()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::PageUp,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![0]));
+
+        let outcome = select()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::PageDown,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![2]));
+    }
+
+    #[test]
+    fn end_and_home_jump_to_the_list_bounds() {
+        let outcome = select()
+            .run_with(&mut ScriptedSource::keys([KeyCode::End, KeyCode::Enter]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![2]));
+
+        let outcome = select()
+            .run_with(&mut ScriptedSource::keys([
+                KeyCode::End,
+                KeyCode::Home,
+                KeyCode::Enter,
+            ]))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted(vec![0]));
     }
 
     #[test]

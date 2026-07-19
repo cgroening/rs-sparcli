@@ -116,21 +116,12 @@ impl TextInput {
 
     /// Opens the value in an external editor, then refreshes the prompt.
     ///
-    /// Raw mode is only toggled when it was already enabled (i.e. a real
-    /// interactive run), so headless callers never alter the terminal.
+    /// A single-line prompt cannot hold newlines, so a multi-line edit is
+    /// flattened back into one line.
     fn launch_editor(&self, state: &mut State) -> Flow<String> {
-        let was_raw =
-            crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
-        if was_raw && let Err(error) = crossterm::terminal::disable_raw_mode() {
-            log::debug!("could not leave raw mode for the editor: {error}");
-        }
         let command = self.editor_command.as_deref();
-        let result = editor::edit_text(command, &state.editor.value(), ".txt");
-        if was_raw && let Err(error) = crossterm::terminal::enable_raw_mode() {
-            log::debug!(
-                "could not re-enter raw mode after the editor: {error}"
-            );
-        }
+        let result =
+            editor::edit_text_suspended(command, &state.editor.value(), ".txt");
         if let Ok(text) = result {
             let single_line = text.replace('\n', " ");
             state.editor.set_value(single_line.trim_end());
@@ -213,5 +204,183 @@ impl TextInput {
             state.history_index = None;
             state.editor.set_value("");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::input::Outcome;
+    use crate::input::event::{KeyCode, ScriptedSource};
+    use crate::input::text::TextInput;
+
+    /// Drives `input` through `keys` and returns the prompt's outcome.
+    fn run(input: &TextInput, keys: Vec<KeyCode>) -> Outcome<String> {
+        input
+            .run_with(&mut ScriptedSource::keys(keys))
+            .expect("a scripted source never fails")
+    }
+
+    /// A prompt with three suggestions and a dropdown.
+    fn with_dropdown() -> TextInput {
+        TextInput::new("pick")
+            .suggestions(["alpha", "alpine", "beta"])
+            .dropdown()
+    }
+
+    #[test]
+    fn arrows_walk_backwards_and_forwards_through_history() {
+        let input = TextInput::new("cmd").history(["first", "second"]);
+        // Up starts at the newest entry, a second Up reaches the older one.
+        let outcome = run(&input, vec![KeyCode::Up, KeyCode::Enter]);
+        assert_eq!(outcome, Outcome::Submitted("second".to_string()));
+        let outcome =
+            run(&input, vec![KeyCode::Up, KeyCode::Up, KeyCode::Enter]);
+        assert_eq!(outcome, Outcome::Submitted("first".to_string()));
+    }
+
+    #[test]
+    fn history_stops_at_the_oldest_entry() {
+        let input = TextInput::new("cmd").history(["only"]);
+        let outcome = run(
+            &input,
+            vec![KeyCode::Up, KeyCode::Up, KeyCode::Up, KeyCode::Enter],
+        );
+        assert_eq!(outcome, Outcome::Submitted("only".to_string()));
+    }
+
+    #[test]
+    fn walking_past_the_newest_history_entry_clears_the_field() {
+        // Down past the newest entry returns to the empty line the user was
+        // typing on, rather than sticking on the last recalled command.
+        let input = TextInput::new("cmd").history(["first", "second"]);
+        let outcome =
+            run(&input, vec![KeyCode::Up, KeyCode::Down, KeyCode::Enter]);
+        assert_eq!(outcome, Outcome::Submitted(String::new()));
+    }
+
+    #[test]
+    fn down_without_a_recalled_entry_does_nothing() {
+        let input = TextInput::new("cmd").history(["first"]);
+        let outcome = run(&input, vec![KeyCode::Down, KeyCode::Enter]);
+        assert_eq!(outcome, Outcome::Submitted(String::new()));
+    }
+
+    #[test]
+    fn tab_fills_the_field_from_the_highlighted_suggestion() {
+        let outcome = run(
+            &with_dropdown(),
+            vec![KeyCode::Char('a'), KeyCode::Tab, KeyCode::Enter],
+        );
+        assert_eq!(outcome, Outcome::Submitted("alpha".to_string()));
+    }
+
+    #[test]
+    fn the_dropdown_highlight_cycles_over_the_matches() {
+        // Two options match "al"; stepping down twice wraps back to the first.
+        // The first Enter accepts the highlight, the second submits it.
+        let keys = |steps: usize| {
+            let mut keys = vec![KeyCode::Char('a'), KeyCode::Char('l')];
+            keys.extend(std::iter::repeat_n(KeyCode::Down, steps));
+            keys.push(KeyCode::Enter);
+            keys.push(KeyCode::Enter);
+            keys
+        };
+        assert_eq!(
+            run(&with_dropdown(), keys(1)),
+            Outcome::Submitted("alpha".to_string()),
+            "the first step highlights the first match"
+        );
+        assert_eq!(
+            run(&with_dropdown(), keys(2)),
+            Outcome::Submitted("alpine".to_string())
+        );
+        assert_eq!(
+            run(&with_dropdown(), keys(3)),
+            Outcome::Submitted("alpha".to_string()),
+            "stepping past the last match wraps to the first"
+        );
+    }
+
+    #[test]
+    fn stepping_up_from_no_highlight_starts_at_the_last_match() {
+        let outcome = run(
+            &with_dropdown(),
+            vec![
+                KeyCode::Char('a'),
+                KeyCode::Char('l'),
+                KeyCode::Up,
+                KeyCode::Enter,
+                KeyCode::Enter,
+            ],
+        );
+        assert_eq!(outcome, Outcome::Submitted("alpine".to_string()));
+    }
+
+    #[test]
+    fn enter_accepts_the_highlight_before_it_submits() {
+        // The first Enter takes the highlighted row, the second submits it.
+        let outcome = run(
+            &with_dropdown(),
+            vec![
+                KeyCode::Char('a'),
+                KeyCode::Down,
+                KeyCode::Enter,
+                KeyCode::Enter,
+            ],
+        );
+        assert_eq!(outcome, Outcome::Submitted("alpha".to_string()));
+    }
+
+    #[test]
+    fn typing_clears_a_stale_dropdown_highlight() {
+        // With a highlight active Enter would accept it. Typing must drop it,
+        // so Enter submits what was actually typed instead of "alpha".
+        let outcome = run(
+            &with_dropdown(),
+            vec![
+                KeyCode::Char('a'),
+                KeyCode::Down,
+                KeyCode::Char('l'),
+                KeyCode::Enter,
+            ],
+        );
+        assert_eq!(outcome, Outcome::Submitted("al".to_string()));
+    }
+
+    #[test]
+    fn ctrl_u_and_ctrl_k_cut_to_the_line_bounds() {
+        use crate::input::event::InputEvent;
+        use crate::input::event::KeyPress;
+
+        let events = |chord: KeyPress| {
+            vec![
+                InputEvent::Key(KeyPress::new(KeyCode::Char('a'))),
+                InputEvent::Key(KeyPress::new(KeyCode::Char('b'))),
+                InputEvent::Key(KeyPress::new(KeyCode::Left)),
+                InputEvent::Key(chord),
+                InputEvent::Key(KeyPress::new(KeyCode::Enter)),
+            ]
+        };
+        let input = TextInput::new("x");
+        let outcome = input
+            .run_with(&mut ScriptedSource::events(events(KeyPress::ctrl('u'))))
+            .unwrap();
+        assert_eq!(
+            outcome,
+            Outcome::Submitted("b".to_string()),
+            "cut to start"
+        );
+        let outcome = input
+            .run_with(&mut ScriptedSource::events(events(KeyPress::ctrl('k'))))
+            .unwrap();
+        assert_eq!(outcome, Outcome::Submitted("a".to_string()), "cut to end");
+    }
+
+    #[test]
+    fn esc_cancels_the_prompt() {
+        assert_eq!(
+            run(&TextInput::new("x"), vec![KeyCode::Esc]),
+            Outcome::Cancelled
+        );
     }
 }

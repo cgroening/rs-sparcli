@@ -30,8 +30,8 @@ cargo run --example output_dynamic --features pager
 cargo run --example prompts --features fuzzy
 
 # Curated, non-interactive collages for README screenshots
-cargo run --example output-readme --features markup
-cargo run --example prompt-readme
+cargo run --example output_readme --features markup
+cargo run --example prompt_readme
 ```
 
 The gallery also works without features (those widgets are simply omitted). Piping the gallery (`| cat`, `> file`) or setting `NO_COLOR=1` yields plain text with no escape codes. The `output_dynamic` animations become no-ops off-terminal (only the final state prints).
@@ -86,7 +86,7 @@ src/
   input/    Interactive prompts over an `EventSource`, plus the shared
             line editor, terminal guard and prompt driver.
 examples/   Runnable demos (output_gallery, output_dynamic, prompts,
-            output-readme, prompt-readme).
+            output_readme, prompt_readme).
 tests/      End-to-end tests over the public API.
 ```
 

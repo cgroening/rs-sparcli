@@ -25,6 +25,7 @@ pub mod fuzzy;
 
 pub(crate) mod field;
 pub(crate) mod prompt;
+pub(crate) mod selection;
 
 /// The result of running an interactive prompt.
 #[derive(Debug, Clone, PartialEq, Eq)]

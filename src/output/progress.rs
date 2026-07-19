@@ -1,11 +1,11 @@
 //! Progress bars with multiple styles and threshold-based coloring.
 
+use crate::core::inplace::InPlace;
 use crate::core::render::Rendered;
 use crate::core::style::{Color, Style};
 use crate::core::text::{Line, Span};
 use crate::core::theme::theme;
 use crate::error::Result;
-use crate::output::live::InPlace;
 
 /// Default bar width in columns.
 const DEFAULT_WIDTH: u16 = 30;
@@ -194,7 +194,7 @@ impl ProgressBar {
     pub fn draw(&mut self, value: f64, max: f64) -> Result<()> {
         let frame = self.bar(value, max);
         self.inplace
-            .get_or_insert_with(|| InPlace::new(false))
+            .get_or_insert_with(InPlace::progress)
             .draw(&frame)
     }
 
@@ -205,8 +205,7 @@ impl ProgressBar {
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     pub fn finish(mut self, value: f64, max: f64) -> Result<()> {
         let frame = self.bar(value, max);
-        let mut inplace =
-            self.inplace.take().unwrap_or_else(|| InPlace::new(false));
+        let mut inplace = self.inplace.take().unwrap_or_else(InPlace::progress);
         inplace.draw(&frame)?;
         inplace.finish()
     }

@@ -6,14 +6,12 @@ mod render;
 mod suggest;
 
 use crate::core::render::Rendered;
-use crate::core::terminal::is_input_tty;
-use crate::error::{Result, SparcliError};
+use crate::error::Result;
 use crate::input::Outcome;
-use crate::input::event::{CrosstermSource, EventSource};
-use crate::input::guard::TerminalGuard;
+use crate::input::event::EventSource;
 use crate::input::history::History;
 use crate::input::line_edit::LineEditor;
-use crate::input::prompt::run_prompt;
+use crate::input::prompt::{run_interactive, run_prompt};
 use crate::input::validate::{CharFilter, Validator};
 
 /// Maximum number of dropdown rows shown at once.
@@ -206,12 +204,7 @@ impl TextInput {
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<String>> {
-        if !is_input_tty() {
-            return Err(SparcliError::NoTerminal);
-        }
-        let _guard = TerminalGuard::new()?;
-        let mut source = CrosstermSource;
-        self.run_with(&mut source)
+        run_interactive(|source| self.run_with(source))
     }
 
     /// Runs the prompt against any event source (used for tests).

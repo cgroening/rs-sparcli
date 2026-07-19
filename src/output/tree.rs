@@ -192,10 +192,6 @@ impl Renderable for Tree {
 mod tests {
     use super::*;
 
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     #[test]
     fn renders_root_and_branches() {
         let tree = Tree::new().node(
@@ -203,7 +199,7 @@ mod tests {
                 .child(TreeNode::new("a"))
                 .child(TreeNode::new("b")),
         );
-        let lines = plain(&tree.render(40));
+        let lines = tree.render(40).plain_lines();
         assert_eq!(lines[0], "root");
         assert_eq!(lines[1], "├─ a");
         assert_eq!(lines[2], "└─ b");
@@ -216,7 +212,7 @@ mod tests {
                 .child(TreeNode::new("a").child(TreeNode::new("a1")))
                 .child(TreeNode::new("b")),
         );
-        let lines = plain(&tree.render(40));
+        let lines = tree.render(40).plain_lines();
         assert_eq!(lines[1], "├─ a");
         assert_eq!(lines[2], "│  └─ a1");
         assert_eq!(lines[3], "└─ b");

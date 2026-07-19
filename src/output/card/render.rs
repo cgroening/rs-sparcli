@@ -1,27 +1,18 @@
-//! The render pipeline of a [`Card`]: regions, rows and the gap-free surface.
+//! The render pipeline of a [`Card`]: capabilities, regions and assembly.
 //!
-//! A [`Rendered`] block is a list of styled spans, not a cell grid, so a
-//! background paints only the characters of its own span. Every row is
-//! therefore assembled through [`region_row`], which materializes the padding
-//! columns, the alignment slack and the border glyphs with the region's
-//! background - and rebases the content spans onto it.
+//! The pipeline resolves the terminal capabilities and the palette, cuts the
+//! card into its three regions, and stacks their rows. The rows themselves are
+//! built in [`super::rows`], the style math lives in [`super::style`].
 
-use crate::core::border::{BorderType, TALL};
-use crate::core::geometry::{Align, Edges, Position};
+use crate::core::border::BorderType;
+use crate::core::geometry::Position;
 use crate::core::render::{Renderable, Rendered};
-use crate::core::style::Style;
-use crate::core::terminal::{ColorSupport, color_support};
-use crate::core::text::{Line, Span};
+use crate::core::terminal::{ColorSupport, UNCONSTRAINED_WIDTH, color_support};
 use crate::core::theme::theme;
-use crate::core::width::{truncate_line, wrap_line};
 use crate::output::card::Card;
 use crate::output::card::palette::{self, CardStyles};
-use crate::output::layout::{blank_line, pad_line};
-
-/// Columns consumed by the two vertical border glyphs.
-const BORDER_COLUMNS: usize = 2;
-/// Marker appended to content that had to be truncated.
-const ELLIPSIS: &str = "…";
+use crate::output::card::rows::{Region, border_columns, edge_row, push_block};
+use crate::output::card::style::{border_over, surface_of};
 
 /// The terminal capabilities a card renders against.
 ///
@@ -56,34 +47,6 @@ impl Renderable for Card {
     }
 }
 
-/// The geometry and styling one row of a card needs.
-struct Region {
-    /// Width of the surface between the borders, in columns.
-    width: usize,
-    /// Padding between the surface edge and the text.
-    padding: Edges,
-    /// Horizontal alignment of the text.
-    align: Align,
-    /// Base style the row's text is rebased onto.
-    text: Style,
-    /// Background of every cell in the row.
-    surface: Style,
-    /// Style of the border glyphs, already carrying the surface background.
-    border: Style,
-    /// Border type; [`BorderType::None`] omits the vertical glyphs.
-    border_type: BorderType,
-    /// Whether overlong lines wrap instead of being truncated.
-    wrap: bool,
-}
-
-impl Region {
-    /// Returns the width available to text, after the horizontal padding.
-    fn area(&self) -> usize {
-        self.width
-            .saturating_sub(self.padding.horizontal() as usize)
-    }
-}
-
 impl Card {
     /// Renders the card for explicit terminal capabilities.
     ///
@@ -97,15 +60,53 @@ impl Card {
         caps: RenderCaps,
     ) -> Rendered {
         let border = self.effective_border(caps);
-        let outer = self.opts.width.map_or(max_width, |w| w.min(max_width));
         let border_columns = border_columns(border);
-        let outer = outer as usize;
+        let outer = self.outer_width(max_width, border_columns) as usize;
         if outer <= border_columns {
             return Rendered::empty();
         }
         let styles = self.resolved_styles(caps.support);
         let surface = outer - border_columns;
         self.assemble(&self.regions(&styles, surface, border), border)
+    }
+
+    /// Resolves the card's outer width in columns.
+    ///
+    /// A card fills the width it is given, which is what makes it read as a
+    /// panel rather than a label. Without a terminal there is no width to
+    /// fill, so an unconstrained card falls back to its natural content width
+    /// instead of stretching to [`UNCONSTRAINED_WIDTH`]. An explicit
+    /// [`Card::width`] always wins, capped at what is available.
+    fn outer_width(&self, max_width: u16, border_columns: usize) -> u16 {
+        if let Some(width) = self.opts.width {
+            return width.min(max_width);
+        }
+        if max_width != UNCONSTRAINED_WIDTH {
+            return max_width;
+        }
+        let natural = self.natural_width() + border_columns;
+        u16::try_from(natural).unwrap_or(UNCONSTRAINED_WIDTH)
+    }
+
+    /// Returns the widest slot's content width plus that slot's padding.
+    ///
+    /// The three slots pad independently, so the widest row is not simply the
+    /// widest text: a narrow title with wide padding can still be the widest.
+    fn natural_width(&self) -> usize {
+        let optional = [
+            (self.title.as_ref(), self.opts.title_padding),
+            (self.footer.as_ref(), self.opts.footer_padding),
+        ];
+        let content =
+            self.content.width() + self.opts.padding.horizontal() as usize;
+        optional
+            .into_iter()
+            .filter_map(|(block, padding)| {
+                block.map(|b| b.width() + padding.horizontal() as usize)
+            })
+            .chain(std::iter::once(content))
+            .max()
+            .unwrap_or(0)
     }
 
     /// Resolves the border type actually drawn.
@@ -216,11 +217,6 @@ impl Card {
     }
 }
 
-/// Returns the columns the vertical border glyphs consume.
-fn border_columns(border: BorderType) -> usize {
-    if border.is_none() { 0 } else { BORDER_COLUMNS }
-}
-
 /// The three regions of a card plus which optional ones are present.
 struct CardRegions {
     /// The title row region.
@@ -255,179 +251,12 @@ impl CardRegions {
     }
 }
 
-/// Appends one region's padding rows, text rows and padding rows.
-fn push_block(lines: &mut Vec<Line>, source: &[Line], region: &Region) {
-    for _ in 0..region.padding.top {
-        lines.push(blank_row(region));
-    }
-    let area = region.area();
-    if area > 0 {
-        for line in source {
-            for fitted in fit(line, area, region.wrap) {
-                lines.push(region_row(fitted, region));
-            }
-        }
-    }
-    for _ in 0..region.padding.bottom {
-        lines.push(blank_row(region));
-    }
-}
-
-/// Fits one line into `area` columns, either by wrapping or by truncating.
-fn fit(line: &Line, area: usize, wrap: bool) -> Vec<Line> {
-    if wrap {
-        return wrap_line(line, area);
-    }
-    vec![truncate_line(line, area, ELLIPSIS)]
-}
-
-/// Builds one full-width row: border glyph, padding, aligned text, padding,
-/// border glyph - every cell carrying the region's background.
-fn region_row(line: Line, region: &Region) -> Line {
-    let mut spans = Vec::new();
-    push_left_border(&mut spans, region);
-    push_padding(&mut spans, region.padding.left, region.surface);
-    let rebased = rebase(line, region.text);
-    let padded = pad_line(rebased, region.area(), region.align, region.surface);
-    spans.extend(padded.spans);
-    push_padding(&mut spans, region.padding.right, region.surface);
-    push_right_border(&mut spans, region);
-    Line::new(spans)
-}
-
-/// Builds an empty row of the region's surface.
-fn blank_row(region: &Region) -> Line {
-    let mut spans = Vec::new();
-    push_left_border(&mut spans, region);
-    spans.extend(blank_line(region.width, region.surface).spans);
-    push_right_border(&mut spans, region);
-    Line::new(spans)
-}
-
-/// Builds the top or bottom border row of a region.
-fn edge_row(region: &Region, position: Position) -> Line {
-    if region.border_type.is_tall() {
-        return tall_edge_row(region, position);
-    }
-    let chars = region.border_type.chars();
-    let (left, right) = match position {
-        Position::Top => (chars.top_left, chars.top_right),
-        Position::Bottom => (chars.bottom_left, chars.bottom_right),
-    };
-    let mut content = String::with_capacity(region.width + BORDER_COLUMNS);
-    content.push(left);
-    for _ in 0..region.width {
-        content.push(chars.horizontal);
-    }
-    content.push(right);
-    Line::new(vec![Span::styled(content, region.border)])
-}
-
-/// Builds a tall border's horizontal row.
-///
-/// The line runs across the corner cells as well, which is what closes the
-/// corner, and it carries no surface behind it so the colored area begins at
-/// the line rather than a row above it.
-fn tall_edge_row(region: &Region, position: Position) -> Line {
-    let glyph = match position {
-        Position::Top => TALL.top,
-        Position::Bottom => TALL.bottom,
-    };
-    let width = region.width + BORDER_COLUMNS;
-    let style = Style {
-        bg: None,
-        ..region.border
-    };
-    Line::new(vec![Span::styled(glyph.to_string().repeat(width), style)])
-}
-
-/// Appends the left border glyph, unless the card is unframed.
-fn push_left_border(spans: &mut Vec<Span>, region: &Region) {
-    if region.border_type.is_none() {
-        return;
-    }
-    let glyph = if region.border_type.is_tall() {
-        TALL.left
-    } else {
-        region.border_type.chars().vertical
-    };
-    spans.push(Span::styled(glyph.to_string(), region.border));
-}
-
-/// Appends the right border glyph, unless the card is unframed.
-fn push_right_border(spans: &mut Vec<Span>, region: &Region) {
-    if region.border_type.is_none() {
-        return;
-    }
-    if region.border_type.is_tall() {
-        let style = swap_colors(region.border);
-        spans.push(Span::styled(TALL.right.to_string(), style));
-        return;
-    }
-    let glyph = region.border_type.chars().vertical;
-    spans.push(Span::styled(glyph.to_string(), region.border));
-}
-
-/// Returns `style` with foreground and background swapped.
-///
-/// A tall border's right-hand glyph inks the left three quarters of its cell;
-/// swapping turns the remaining quarter into the bar, which is the only way to
-/// get a right-aligned quarter block - Unicode does not define one. Returns
-/// the style unchanged when either color is unset, since the swap needs both.
-fn swap_colors(style: Style) -> Style {
-    let (Some(fg), Some(bg)) = (style.fg, style.bg) else {
-        return style;
-    };
-    style.fg(bg).bg(fg)
-}
-
-/// Appends `columns` padding cells carrying the surface background.
-fn push_padding(spans: &mut Vec<Span>, columns: u16, surface: Style) {
-    if columns == 0 {
-        return;
-    }
-    spans.push(Span::styled(" ".repeat(columns as usize), surface));
-}
-
-/// Rebases every span of `line` onto `base`.
-///
-/// Without this the content spans keep their own (usually unset) background and
-/// punch transparent holes through the surface - invisible in the plain text,
-/// visible in the terminal.
-fn rebase(line: Line, base: Style) -> Line {
-    let spans = line
-        .spans
-        .into_iter()
-        .map(|mut span| {
-            span.style = base.patch(span.style);
-            span
-        })
-        .collect();
-    Line::new(spans)
-}
-
-/// Reduces a text style to the background it sits on.
-fn surface_of(style: Style) -> Style {
-    match style.bg {
-        Some(bg) => Style::new().bg(bg),
-        None => Style::new(),
-    }
-}
-
-/// Returns the border style carrying the given surface's background, so the
-/// glyphs do not leave a transparent seam along the card's edges.
-fn border_over(border: Style, surface: Style) -> Style {
-    match surface.bg {
-        Some(bg) => border.bg(bg),
-        None => border,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::style::Color;
-    use crate::core::text::Text;
+    use crate::core::geometry::{Align, Edges};
+    use crate::core::style::{Color, Style};
+    use crate::core::text::{Line, Span, Text};
 
     /// Renders a card at truecolor, bypassing the environment detection that
     /// would report [`ColorSupport::None`] under `cargo test`.
@@ -436,10 +265,6 @@ mod tests {
     }
 
     /// Returns the plain text of every row.
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     /// Returns the background of a row, taken from its first span.
     fn row_background(rendered: &Rendered, row: usize) -> Option<Color> {
         rendered.lines[row]
@@ -524,7 +349,7 @@ mod tests {
     fn footer_row_is_last_and_has_its_own_background() {
         let out = render(Card::new("body").footer("footer"), 30);
         let last = out.lines.len() - 1;
-        assert!(plain(&out)[last].contains("footer"));
+        assert!(out.plain_lines()[last].contains("footer"));
         assert_ne!(row_background(&out, last), row_background(&out, 1));
     }
 
@@ -550,7 +375,7 @@ mod tests {
             .title("Heading")
             .padding(Edges::symmetric(0, 1))
             .border(BorderType::Single);
-        let lines = plain(&render(card, 30));
+        let lines = render(card, 30).plain_lines();
         assert_eq!(lines.len(), 4);
         assert!(lines[1].contains("Heading"));
         assert!(lines[2].contains("body"));
@@ -561,7 +386,7 @@ mod tests {
         // Surface 20 minus one padding column per side leaves 18 columns, so
         // the text wraps into "alpha beta gamma" and "delta epsilon".
         let card = Card::new("alpha beta gamma delta epsilon").width(20);
-        let lines = plain(&render(card, 80));
+        let lines = render(card, 80).plain_lines();
         assert_eq!(lines.len(), 4, "two wrapped rows plus two blanks");
         assert!(lines[1].contains("alpha beta gamma"));
         assert!(lines[2].contains("delta epsilon"));
@@ -573,7 +398,7 @@ mod tests {
         let card = Card::new("alpha beta gamma delta epsilon")
             .width(20)
             .wrap(false);
-        let lines = plain(&render(card, 80));
+        let lines = render(card, 80).plain_lines();
         assert_eq!(lines.len(), 3, "one truncated row plus two blanks");
         assert!(lines[1].contains('…'));
     }
@@ -595,6 +420,31 @@ mod tests {
     }
 
     #[test]
+    fn an_unconstrained_card_shrinks_to_its_content() {
+        // Piped output has no terminal width to fill, so the card must not
+        // stretch to UNCONSTRAINED_WIDTH; it lays out at its natural width.
+        let out = render(Card::new("body"), UNCONSTRAINED_WIDTH);
+        // "body" plus the default single padding column on each side.
+        assert_eq!(out.lines[0].width(), 6);
+        assert!(out.plain().contains("body"));
+    }
+
+    #[test]
+    fn an_unconstrained_card_still_honors_an_explicit_width() {
+        let out = render(Card::new("body").width(20), UNCONSTRAINED_WIDTH);
+        for line in &out.lines {
+            assert_eq!(line.width(), 20);
+        }
+    }
+
+    #[test]
+    fn an_unconstrained_card_measures_its_widest_slot() {
+        let card = Card::new("body").title("a much longer heading");
+        let out = render(card, UNCONSTRAINED_WIDTH);
+        assert_eq!(out.lines[0].width(), "a much longer heading".len() + 2);
+    }
+
+    #[test]
     fn degenerate_width_renders_nothing() {
         let card = Card::new("hi").width(2).border(BorderType::Single);
         assert_eq!(render(card, 80), Rendered::empty());
@@ -606,7 +456,7 @@ mod tests {
             .title("Heading")
             .title_padding(Edges::all(0))
             .padding(Edges::all(2));
-        let lines = plain(&render(card, 30));
+        let lines = render(card, 30).plain_lines();
         assert_eq!(lines.len(), 6, "title plus two blanks around one body row");
         assert!(lines[0].starts_with("Heading"));
         assert!(lines[3].starts_with("  body"));
@@ -622,7 +472,7 @@ mod tests {
         // Text area 18: the right-aligned title ends one padding column short
         // of the edge, the centered body sits behind seven slack columns plus
         // the one padding column.
-        let lines = plain(&render(card, 30));
+        let lines = render(card, 30).plain_lines();
         assert!(lines[0].ends_with("Heading "), "{:?}", lines[0]);
         assert_eq!(lines[2], "        body        ");
     }
@@ -645,7 +495,7 @@ mod tests {
         let card = Card::new("aaaa bbbb cccc")
             .width(20)
             .padding(Edges::symmetric(0, 4));
-        let lines = plain(&render(card, 30));
+        let lines = render(card, 30).plain_lines();
         assert_eq!(lines.len(), 2);
         assert!(lines[0].contains("aaaa bbbb"));
         assert!(lines[1].contains("cccc"));
@@ -708,7 +558,7 @@ mod tests {
         // the inner side of its row, so it touches the side bar of the
         // adjoining row instead of starting a cell away from it.
         let card = Card::new("body").border(BorderType::Tall);
-        let lines = plain(&render(card, 20));
+        let lines = render(card, 20).plain_lines();
         let last = lines.len() - 1;
         assert_eq!(lines[0], "▁".repeat(20));
         assert_eq!(lines[last], "▔".repeat(20));
@@ -794,7 +644,7 @@ mod tests {
     #[test]
     fn a_multiline_title_produces_one_row_per_line() {
         let card = Card::new("body").title(Text::raw("first\nsecond"));
-        let lines = plain(&render(card, 30));
+        let lines = render(card, 30).plain_lines();
         assert!(lines[0].contains("first"));
         assert!(lines[1].contains("second"));
     }

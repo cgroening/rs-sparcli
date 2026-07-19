@@ -277,21 +277,17 @@ fn to_roman(mut value: usize, upper: bool) -> String {
 mod tests {
     use super::*;
 
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     #[test]
     fn bulleted_list_prefixes_each_item() {
         let list = List::new().item("a").item("b");
-        let lines = plain(&list.render(40));
+        let lines = list.render(40).plain_lines();
         assert_eq!(lines, vec!["• a", "• b"]);
     }
 
     #[test]
     fn numbered_list_counts_items() {
         let list = List::ordered(Marker::Number).item("x").item("y");
-        let lines = plain(&list.render(40));
+        let lines = list.render(40).plain_lines();
         assert_eq!(lines, vec!["1. x", "2. y"]);
     }
 
@@ -299,7 +295,7 @@ mod tests {
     fn nested_list_is_indented() {
         let child = List::new().item("child");
         let list = List::new().item_with("parent", child);
-        let lines = plain(&list.render(40));
+        let lines = list.render(40).plain_lines();
         assert_eq!(lines[0], "• parent");
         assert!(lines[1].starts_with("  • child"));
     }

@@ -7,6 +7,8 @@
 
 mod palette;
 mod render;
+mod rows;
+mod style;
 
 use crate::core::border::BorderType;
 use crate::core::geometry::{Align, Edges};
@@ -316,5 +318,84 @@ impl Card {
     pub fn footer_style(mut self, style: Style) -> Self {
         self.opts.footer_style = style;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_new_card_has_no_title_and_no_footer() {
+        let card = Card::new("body");
+        assert!(card.title.is_none());
+        assert!(card.footer.is_none());
+        assert_eq!(card.content.plain(), "body");
+        assert!(card.opts.wrap, "wrapping is on by default");
+        assert_eq!(card.opts.width, None);
+    }
+
+    #[test]
+    fn from_rendered_keeps_the_block_as_given() {
+        let block = Rendered::new(vec![
+            crate::core::text::Line::raw("one"),
+            crate::core::text::Line::raw("two"),
+        ]);
+        let card = Card::from_rendered(block);
+        assert_eq!(card.content.height(), 2);
+    }
+
+    #[test]
+    fn the_three_slots_take_independent_padding_and_alignment() {
+        // A card's title, body and footer are styled separately; a builder
+        // that leaked into a neighbouring slot would be invisible in the
+        // rendered output until someone set only one of them.
+        let card = Card::new("body")
+            .title("t")
+            .footer("f")
+            .title_padding(Edges::all(1))
+            .padding(Edges::all(2))
+            .footer_padding(Edges::all(3))
+            .title_align(Align::Center)
+            .content_align(Align::Right)
+            .footer_align(Align::Left);
+        assert_eq!(card.opts.title_padding, Edges::all(1));
+        assert_eq!(card.opts.padding, Edges::all(2));
+        assert_eq!(card.opts.footer_padding, Edges::all(3));
+        assert_eq!(card.opts.title_align, Align::Center);
+        assert_eq!(card.opts.content_align, Align::Right);
+        assert_eq!(card.opts.footer_align, Align::Left);
+    }
+
+    #[test]
+    fn flat_title_and_flat_footer_are_separate_switches() {
+        let card = Card::new("body").flat_title();
+        assert!(card.opts.flat_title);
+        assert!(!card.opts.flat_footer);
+        let card = Card::new("body").flat_footer();
+        assert!(!card.opts.flat_title);
+        assert!(card.opts.flat_footer);
+    }
+
+    #[test]
+    fn the_style_builders_target_their_own_slot() {
+        let bold = Style::new().bold();
+        let card = Card::new("body").title_style(bold);
+        assert_eq!(card.opts.title_style, bold);
+        assert_eq!(card.opts.content_style, Style::new());
+        assert_eq!(card.opts.footer_style, Style::new());
+    }
+
+    #[test]
+    fn accent_border_and_width_are_recorded() {
+        let card = Card::new("body")
+            .accent(Color::Red)
+            .border(BorderType::Tall)
+            .width(30)
+            .wrap(false);
+        assert_eq!(card.opts.accent, Color::Red);
+        assert_eq!(card.opts.border, BorderType::Tall);
+        assert_eq!(card.opts.width, Some(30));
+        assert!(!card.opts.wrap);
     }
 }

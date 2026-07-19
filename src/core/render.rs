@@ -13,7 +13,7 @@ use crossterm::style::{
 };
 
 use crate::core::style::Attribute;
-use crate::core::terminal::{ColorSupport, color_support, term_width};
+use crate::core::terminal::{ColorSupport, color_support, output_width};
 use crate::core::text::{Line, Span, Text};
 use crate::error::Result;
 
@@ -58,6 +58,23 @@ impl Rendered {
             .collect::<Vec<_>>()
             .join("\n")
     }
+
+    /// Returns the plain text of each line, styles stripped.
+    ///
+    /// Like [`plain`](Self::plain) but keeps the lines apart, which is what
+    /// assertions on a widget's layout usually want.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sparcli::{Panel, Renderable};
+    ///
+    /// let lines = Panel::new("hi").render(20).plain_lines();
+    /// assert!(lines[1].contains("hi"));
+    /// ```
+    pub fn plain_lines(&self) -> Vec<String> {
+        self.lines.iter().map(Line::plain).collect()
+    }
 }
 
 /// Anything that can be laid out into a [`Rendered`] and printed.
@@ -65,28 +82,35 @@ pub trait Renderable {
     /// Lays the value out for a terminal at most `max_width` columns wide.
     fn render(&self, max_width: u16) -> Rendered;
 
-    /// Renders at the current terminal width and prints to standard output.
+    /// Renders for the current output width and prints to standard output.
+    ///
+    /// At a terminal that is its width. Piped or redirected there is no width
+    /// to fit, so nothing is truncated and the block keeps its natural width -
+    /// clipping to an invented default would drop data from the pipe without
+    /// saying so.
     ///
     /// # Errors
     ///
     /// Returns [`crate::SparcliError::Io`] if writing to stdout fails.
     fn print(&self) -> Result<()> {
-        let rendered = self.render(term_width());
+        let rendered = self.render(output_width());
         let mut out = io::stdout().lock();
         write_rendered(&mut out, &rendered, color_support())?;
         out.flush()?;
         Ok(())
     }
 
-    /// Renders at the current terminal width and writes to `writer`.
+    /// Renders for the current output width and writes to `writer`.
     ///
-    /// Useful for redirecting output to a file or in-memory buffer.
+    /// Useful for redirecting output to a file or in-memory buffer. Width is
+    /// resolved exactly as in [`print`](Self::print); pass an explicit width
+    /// to [`render`](Self::render) instead when the target is neither.
     ///
     /// # Errors
     ///
     /// Returns [`crate::SparcliError::Io`] if writing fails.
     fn print_to<W: Write>(&self, writer: &mut W) -> Result<()> {
-        let rendered = self.render(term_width());
+        let rendered = self.render(output_width());
         write_rendered(writer, &rendered, color_support())?;
         writer.flush()?;
         Ok(())

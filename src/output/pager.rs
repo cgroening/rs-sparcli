@@ -3,10 +3,9 @@
 //! Available with the `pager` feature. When output is not a terminal (and the
 //! pager is not forced), content is printed directly instead.
 
-use std::env;
 use std::process::{Command, Stdio};
 
-use crate::core::command::split_command;
+use crate::core::command::{program_and_args, resolve_from_env};
 use crate::core::render::{Renderable, write_rendered};
 use crate::core::terminal::{ColorSupport, is_output_tty, term_width};
 use crate::error::{Result, SparcliError};
@@ -39,7 +38,10 @@ impl Pager {
         }
     }
 
-    /// Overrides the pager command (whitespace-split, no shell).
+    /// Overrides the pager command.
+    ///
+    /// Split with [`split_command`](crate::core::command::split_command), so a
+    /// quoted path containing spaces survives; never passed to a shell.
     #[must_use]
     pub fn command(mut self, command: impl Into<String>) -> Self {
         self.command = Some(command.into());
@@ -66,11 +68,7 @@ impl Pager {
         }
         let rendered = content.render(term_width());
         let resolved = self.resolve_command();
-        let argv = split_command(&resolved)
-            .ok_or_else(|| SparcliError::Config("unparsable pager".into()))?;
-        let (program, args) = argv
-            .split_first()
-            .ok_or_else(|| SparcliError::Config("empty pager".into()))?;
+        let (program, args) = program_and_args(&resolved, "pager")?;
         let mut child = Command::new(program)
             .args(args)
             .stdin(Stdio::piped())
@@ -87,13 +85,7 @@ impl Pager {
 
     /// Resolves the pager command string.
     fn resolve_command(&self) -> String {
-        if let Some(command) = &self.command {
-            return command.clone();
-        }
-        env::var("PAGER")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| DEFAULT_PAGER.to_string())
+        resolve_from_env(self.command.as_deref(), &["PAGER"], DEFAULT_PAGER)
     }
 }
 

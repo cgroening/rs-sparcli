@@ -2,17 +2,15 @@
 
 use crate::core::render::Rendered;
 use crate::core::style::Style;
-use crate::core::terminal::is_input_tty;
 use crate::core::text::Line;
 use crate::core::theme::theme;
-use crate::error::{Result, SparcliError};
+use crate::error::Result;
 use crate::input::Outcome;
-use crate::input::editor::edit_text;
-use crate::input::event::{CrosstermSource, EventSource, InputEvent, KeyPress};
+use crate::input::editor::edit_text_suspended;
+use crate::input::event::{EventSource, InputEvent, KeyPress};
 use crate::input::field::field_line;
-use crate::input::guard::TerminalGuard;
 use crate::input::line_edit::LineEditor;
-use crate::input::prompt::{Flow, run_prompt};
+use crate::input::prompt::{Flow, run_interactive, run_prompt};
 
 /// A multi-line text input prompt.
 ///
@@ -75,12 +73,7 @@ impl Textarea {
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
     pub fn run(self) -> Result<Outcome<String>> {
-        if !is_input_tty() {
-            return Err(SparcliError::NoTerminal);
-        }
-        let _guard = TerminalGuard::new()?;
-        let mut source = CrosstermSource;
-        self.run_with(&mut source)
+        run_interactive(|source| self.run_with(source))
     }
 
     /// Runs the prompt against any event source (used for tests).
@@ -202,22 +195,9 @@ impl Textarea {
     }
 
     /// Opens the buffer in an external editor, then refreshes the prompt.
-    ///
-    /// Raw mode is only toggled when it was already enabled, so headless
-    /// callers never alter the terminal.
     fn launch_editor(&self, editor: &mut LineEditor) -> Flow<String> {
-        let was_raw =
-            crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
-        if was_raw && let Err(error) = crossterm::terminal::disable_raw_mode() {
-            log::debug!("could not leave raw mode for the editor: {error}");
-        }
         let command = self.editor_command.as_deref();
-        let result = edit_text(command, &editor.value(), ".md");
-        if was_raw && let Err(error) = crossterm::terminal::enable_raw_mode() {
-            log::debug!(
-                "could not re-enter raw mode after the editor: {error}"
-            );
-        }
+        let result = edit_text_suspended(command, &editor.value(), ".md");
         if let Ok(text) = result {
             editor.set_value(text.trim_end_matches('\n'));
         }

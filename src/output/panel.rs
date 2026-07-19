@@ -1,51 +1,14 @@
 //! Bordered panels framing content with an optional title and subtitle.
+//!
+//! The frame geometry itself lives in [`crate::output::box_draw`], which
+//! [`Alert`](crate::output::alert::Alert) shares.
 
 use crate::core::border::BorderType;
 use crate::core::geometry::{Align, Edges, Position, Title};
 use crate::core::render::{Renderable, Rendered};
 use crate::core::style::Style;
-use crate::core::text::{Line, Span, Text};
-use crate::core::theme::theme;
-use crate::core::width::truncate;
-use crate::output::layout::{blank_line, pad_line};
-
-/// Columns consumed by the two vertical border glyphs.
-const BORDER_COLUMNS: usize = 2;
-
-/// Box-drawing options shared by panels and other framed widgets.
-pub(crate) struct BoxOpts {
-    /// Border style.
-    pub border: BorderType,
-    /// Style applied to the border glyphs.
-    pub border_style: Style,
-    /// Fill style for the interior (padding and content background).
-    pub fill: Style,
-    /// Inner padding between border and content.
-    pub padding: Edges,
-    /// Optional title.
-    pub title: Option<Title>,
-    /// Optional subtitle (bottom edge by default).
-    pub subtitle: Option<Title>,
-    /// Optional fixed outer width in columns.
-    pub width: Option<u16>,
-    /// Horizontal alignment of content within the panel.
-    pub content_align: Align,
-}
-
-impl Default for BoxOpts {
-    fn default() -> Self {
-        Self {
-            border: theme().border,
-            border_style: Style::new(),
-            fill: Style::new(),
-            padding: Edges::symmetric(0, 1),
-            title: None,
-            subtitle: None,
-            width: None,
-            content_align: Align::Left,
-        }
-    }
-}
+use crate::core::text::Text;
+use crate::output::box_draw::{BoxOpts, draw_box};
 
 /// A bordered panel around rich content.
 ///
@@ -144,221 +107,14 @@ impl Renderable for Panel {
     }
 }
 
-/// Frames `content` according to `opts`, clamped to `max_width` columns.
-///
-/// The frame never exceeds `max_width`: a fixed width is capped, natural
-/// content that overflows shrinks the frame, and a title too wide for the
-/// interior is truncated rather than widening the box.
-pub(crate) fn draw_box(
-    content: &Rendered,
-    opts: &BoxOpts,
-    max_width: u16,
-) -> Rendered {
-    let max_width = max_width as usize;
-    if opts.border.is_none() {
-        return frame_borderless(content, opts, max_width);
-    }
-    let area_width = compute_area_width(content, opts, max_width);
-    let content_area =
-        area_width.saturating_sub(opts.padding.horizontal() as usize);
-
-    let mut lines = Vec::new();
-    let top_title = edge_title(opts, Position::Top);
-    lines.push(edge_line(opts, area_width, Position::Top, top_title));
-    push_padding_rows(&mut lines, opts, area_width, opts.padding.top);
-    for line in &content.lines {
-        lines.push(content_row(line, opts, content_area));
-    }
-    push_padding_rows(&mut lines, opts, area_width, opts.padding.bottom);
-    let bottom_title = edge_title(opts, Position::Bottom);
-    lines.push(edge_line(opts, area_width, Position::Bottom, bottom_title));
-    Rendered::new(lines)
-}
-
-/// Returns the title that sits on the given edge, if any.
-fn edge_title(opts: &BoxOpts, position: Position) -> Option<&Title> {
-    [opts.title.as_ref(), opts.subtitle.as_ref()]
-        .into_iter()
-        .flatten()
-        .find(|title| title.position == position)
-}
-
-/// Computes the interior width between the vertical borders, clamped so the
-/// whole frame fits within `max_width`.
-fn compute_area_width(
-    content: &Rendered,
-    opts: &BoxOpts,
-    max_width: usize,
-) -> usize {
-    let border_cols = if opts.border.is_none() {
-        0
-    } else {
-        BORDER_COLUMNS
-    };
-    let padding = opts.padding.horizontal() as usize;
-    let overhead = border_cols + padding;
-    let content_area = match opts.width {
-        Some(total) => (total as usize).min(max_width).saturating_sub(overhead),
-        None => {
-            let natural = content.width();
-            if natural + overhead <= max_width {
-                natural
-            } else {
-                max_width.saturating_sub(overhead)
-            }
-        }
-    };
-    content_area + padding
-}
-
-/// Builds the content padding rows (blank interior lines).
-fn push_padding_rows(
-    lines: &mut Vec<Line>,
-    opts: &BoxOpts,
-    area_width: usize,
-    count: u16,
-) {
-    for _ in 0..count {
-        lines.push(wrap_with_borders(blank_line(area_width, opts.fill), opts));
-    }
-}
-
-/// Builds one aligned, padded content line without border glyphs.
-fn inner_row(line: &Line, opts: &BoxOpts, content_area: usize) -> Line {
-    let mut spans = Vec::new();
-    if opts.padding.left > 0 {
-        spans.push(Span::styled(
-            " ".repeat(opts.padding.left as usize),
-            opts.fill,
-        ));
-    }
-    let padded =
-        pad_line(line.clone(), content_area, opts.content_align, opts.fill);
-    spans.extend(padded.spans);
-    if opts.padding.right > 0 {
-        spans.push(Span::styled(
-            " ".repeat(opts.padding.right as usize),
-            opts.fill,
-        ));
-    }
-    Line::new(spans)
-}
-
-/// Wraps one content line with padding and vertical borders.
-fn content_row(line: &Line, opts: &BoxOpts, content_area: usize) -> Line {
-    wrap_with_borders(inner_row(line, opts, content_area), opts)
-}
-
-/// Adds left/right vertical border glyphs around `inner`.
-fn wrap_with_borders(inner: Line, opts: &BoxOpts) -> Line {
-    let chars = opts.border.chars();
-    let mut spans = Vec::with_capacity(inner.spans.len() + 2);
-    spans.push(Span::styled(chars.vertical.to_string(), opts.border_style));
-    spans.extend(inner.spans);
-    spans.push(Span::styled(chars.vertical.to_string(), opts.border_style));
-    Line::new(spans)
-}
-
-/// Builds a top or bottom border line, optionally embedding a title.
-fn edge_line(
-    opts: &BoxOpts,
-    area_width: usize,
-    position: Position,
-    title: Option<&Title>,
-) -> Line {
-    let chars = opts.border.chars();
-    let (left, right) = match position {
-        Position::Bottom => (chars.bottom_left, chars.bottom_right),
-        Position::Top => (chars.top_left, chars.top_right),
-    };
-    let mut spans = vec![Span::styled(left.to_string(), opts.border_style)];
-    match title {
-        None => spans.push(horizontal_fill(chars.horizontal, area_width, opts)),
-        Some(title) => {
-            push_titled_fill(&mut spans, title, area_width, opts);
-        }
-    }
-    spans.push(Span::styled(right.to_string(), opts.border_style));
-    Line::new(spans)
-}
-
-/// Builds a horizontal fill span of `width` border glyphs.
-fn horizontal_fill(glyph: char, width: usize, opts: &BoxOpts) -> Span {
-    Span::styled(glyph.to_string().repeat(width), opts.border_style)
-}
-
-/// Embeds a title within a horizontal border run so it reads as part of the
-/// frame. A left-aligned title keeps exactly one connecting border glyph before
-/// it (`┌─ Title ─`), never a flush `┌ Title`; the glyphs on both sides take the
-/// border style so the seam stays uniform.
-fn push_titled_fill(
-    spans: &mut Vec<Span>,
-    title: &Title,
-    area_width: usize,
-    opts: &BoxOpts,
-) {
-    let chars = opts.border.chars();
-    let pad = title.pad as usize;
-    let title_line = title.content.lines.first().cloned().unwrap_or_default();
-    let title_w = title_line.width() + 2 * pad;
-    if title_w >= area_width {
-        // Too wide for the interior: truncate into the border run instead of
-        // widening the frame.
-        let text = truncate(&title_line.plain(), area_width, "…");
-        spans.push(Span::styled(text, opts.border_style));
-        return;
-    }
-    let remaining = area_width - title_w;
-    let (left_fill, right_fill) = match title.align {
-        Align::Left => (1.min(remaining), remaining.saturating_sub(1)),
-        Align::Right => (remaining.saturating_sub(1), 1.min(remaining)),
-        Align::Center => (remaining / 2, remaining - remaining / 2),
-    };
-    spans.push(horizontal_fill(chars.horizontal, left_fill, opts));
-    if pad > 0 {
-        spans.push(Span::raw(" ".repeat(pad)));
-    }
-    spans.extend(title_line.spans);
-    if pad > 0 {
-        spans.push(Span::raw(" ".repeat(pad)));
-    }
-    spans.push(horizontal_fill(chars.horizontal, right_fill, opts));
-}
-
-/// Frames content without borders: padding around it, clamped to `max_width`.
-fn frame_borderless(
-    content: &Rendered,
-    opts: &BoxOpts,
-    max_width: usize,
-) -> Rendered {
-    let area_width = compute_area_width(content, opts, max_width);
-    let content_area =
-        area_width.saturating_sub(opts.padding.horizontal() as usize);
-    let mut lines = Vec::new();
-    for _ in 0..opts.padding.top {
-        lines.push(blank_line(area_width, opts.fill));
-    }
-    for line in &content.lines {
-        lines.push(inner_row(line, opts, content_area));
-    }
-    for _ in 0..opts.padding.bottom {
-        lines.push(blank_line(area_width, opts.fill));
-    }
-    Rendered::new(lines)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn plain(rendered: &Rendered) -> Vec<String> {
-        rendered.lines.iter().map(Line::plain).collect()
-    }
-
     #[test]
     fn panel_frames_content_with_border() {
         let panel = Panel::new("hi").border(BorderType::Single);
-        let lines = plain(&panel.render(40));
+        let lines = panel.render(40).plain_lines();
         assert_eq!(lines.len(), 3);
         assert!(lines[0].starts_with('┌'));
         assert!(lines[1].contains("hi"));
@@ -370,7 +126,7 @@ mod tests {
         let panel = Panel::new("body")
             .border(BorderType::Single)
             .title(Title::new("Info"));
-        let lines = plain(&panel.render(40));
+        let lines = panel.render(40).plain_lines();
         assert!(lines[0].contains("Info"));
     }
 
@@ -382,7 +138,7 @@ mod tests {
         let panel = Panel::new("a wide body of content")
             .border(BorderType::Single)
             .title(Title::new("Info"));
-        let lines = plain(&panel.render(40));
+        let lines = panel.render(40).plain_lines();
         assert!(lines[0].starts_with("\u{250c}\u{2500} Info "));
     }
 
@@ -391,7 +147,7 @@ mod tests {
         let panel = Panel::new("x")
             .border(BorderType::None)
             .padding(Edges::all(1));
-        let lines = plain(&panel.render(40));
+        let lines = panel.render(40).plain_lines();
         assert_eq!(lines.len(), 3);
         assert_eq!(lines[1], " x ");
     }
@@ -400,7 +156,7 @@ mod tests {
     fn fixed_width_is_clamped_to_max_width() {
         // A fixed width wider than the terminal is capped so the border fits.
         let panel = Panel::new("hi").border(BorderType::Single).width(200);
-        let lines = plain(&panel.render(80));
+        let lines = panel.render(80).plain_lines();
         assert_eq!(lines[0].chars().count(), 80);
         assert_eq!(lines[2].chars().count(), 80);
     }
@@ -411,7 +167,7 @@ mod tests {
         // overflowing the border edges.
         let panel =
             Panel::new("abcdefghijklmnopqrstuvwxyz").border(BorderType::Single);
-        let lines = plain(&panel.render(12));
+        let lines = panel.render(12).plain_lines();
         assert_eq!(lines[0].chars().count(), 12);
     }
 
@@ -422,7 +178,7 @@ mod tests {
         let panel = Panel::new("x")
             .border(BorderType::Single)
             .title(Title::new("A very long title here"));
-        let lines = plain(&panel.render(20));
+        let lines = panel.render(20).plain_lines();
         assert!(lines[0].chars().count() <= 20);
         assert!(lines[0].contains('…'));
     }

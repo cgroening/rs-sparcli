@@ -1,11 +1,11 @@
 //! Animated spinners for in-progress operations.
 
+use crate::core::inplace::InPlace;
 use crate::core::render::Rendered;
 use crate::core::style::{Color, Style};
 use crate::core::text::{Line, Span};
 use crate::core::theme::theme;
 use crate::error::Result;
-use crate::output::live::InPlace;
 
 /// The animation style of a spinner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -106,7 +106,7 @@ impl Spinner {
     pub fn tick(&mut self) -> Result<()> {
         let frame = self.frame();
         self.inplace
-            .get_or_insert_with(|| InPlace::new(false))
+            .get_or_insert_with(InPlace::progress)
             .draw(&frame)?;
         self.frame_index = self.frame_index.wrapping_add(1);
         Ok(())
@@ -145,8 +145,7 @@ impl Spinner {
         };
         self.label = label.into();
         let frame = self.compose(glyph.to_string(), style);
-        let mut inplace =
-            self.inplace.take().unwrap_or_else(|| InPlace::new(false));
+        let mut inplace = self.inplace.take().unwrap_or_else(InPlace::progress);
         inplace.draw(&frame)?;
         inplace.finish()
     }

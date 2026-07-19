@@ -12,6 +12,12 @@ pub use self::line::{truncate_line, wrap_line};
 use unicode_width::UnicodeWidthChar;
 use unicode_width::UnicodeWidthStr;
 
+/// Marker appended to text that was cut off to fit its column.
+///
+/// The single source for the truncation marker, so every widget clips the same
+/// way; pass it to [`truncate`] and [`truncate_line`].
+pub const ELLIPSIS: &str = "…";
+
 /// The ASCII escape byte that starts ANSI sequences.
 const ESC: char = '\u{1b}';
 
