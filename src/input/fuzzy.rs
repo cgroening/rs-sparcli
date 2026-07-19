@@ -290,8 +290,7 @@ impl FuzzySelect {
     /// Recomputes the filtered list and resets the cursor to the top.
     fn refilter(&self, state: &mut State) {
         state.filtered = self.filter(&state.query.value());
-        state.cursor.set_len(state.filtered.len());
-        state.cursor.reset();
+        state.cursor.refill(state.filtered.len());
     }
 
     /// Filters and ranks options for `query` (original order when empty).
