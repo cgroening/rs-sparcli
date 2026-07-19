@@ -1,7 +1,13 @@
 //! Display-width math: visible width, ANSI stripping, truncation, wrapping.
 //!
 //! All widths are measured in terminal columns and are aware of wide glyphs
-//! (CJK, emoji), zero-width combining marks and ANSI escape sequences.
+//! (CJK, emoji), zero-width combining marks and ANSI escape sequences. The
+//! plain-string helpers live here; their style-preserving counterparts for
+//! [`Line`](crate::core::text::Line) live in the `line` submodule.
+
+mod line;
+
+pub use self::line::{truncate_line, wrap_line};
 
 use unicode_width::UnicodeWidthChar;
 use unicode_width::UnicodeWidthStr;

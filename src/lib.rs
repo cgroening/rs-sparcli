@@ -52,6 +52,7 @@ pub use core::theme::{Theme, set_theme, theme};
 pub use error::{Result, SparcliError};
 pub use output::alert::{Alert, AlertKind};
 pub use output::badge::Badge;
+pub use output::card::Card;
 pub use output::columns::Columns;
 pub use output::diff::Diff;
 pub use output::kv::KeyValue;
@@ -114,7 +115,9 @@ pub mod shortcut {
 
 /// Unicode-aware display-width helpers (width, ANSI stripping, wrap, truncate).
 pub mod width {
-    pub use crate::core::width::{strip_ansi, truncate, visible_width, wrap};
+    pub use crate::core::width::{
+        strip_ansi, truncate, truncate_line, visible_width, wrap, wrap_line,
+    };
 }
 
 /// Terminal capability and size detection.
@@ -136,6 +139,7 @@ pub mod prelude {
     pub use crate::error::{Result, SparcliError};
     pub use crate::output::alert::{Alert, AlertKind};
     pub use crate::output::badge::Badge;
+    pub use crate::output::card::Card;
     pub use crate::output::compose::{align, pad, vstack};
     pub use crate::output::kv::KeyValue;
     pub use crate::output::list::{List, Marker};

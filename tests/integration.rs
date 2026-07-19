@@ -6,7 +6,7 @@
 
 use sparcli::prelude::*;
 use sparcli::width::strip_ansi;
-use sparcli::{Alert, List, Marker, Panel, Table, Tree, TreeNode};
+use sparcli::{Alert, Card, List, Marker, Panel, Table, Tree, TreeNode};
 
 /// Renders a widget and returns its visible text (no ANSI escapes).
 fn visible(widget: &impl Renderable) -> String {
@@ -35,6 +35,19 @@ fn panel_frames_titled_content() {
     let output = visible(&panel);
     assert!(output.contains("Greeting"));
     assert!(output.contains("hello from the panel body"));
+}
+
+#[test]
+fn card_renders_title_content_and_footer() {
+    let card = Card::new("hello from the card body")
+        .title("Greeting")
+        .footer("signed, the card")
+        .accent(Color::Blue)
+        .width(40);
+    let output = visible(&card);
+    assert!(output.contains("Greeting"));
+    assert!(output.contains("hello from the card body"));
+    assert!(output.contains("signed, the card"));
 }
 
 #[test]

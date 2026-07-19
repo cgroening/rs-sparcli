@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Added
 
+- `Card`, a filled counterpart to `Panel`: a colored surface with its own title and footer rows instead of a title embedded in the border. A single `.accent(...)` derives the whole palette through HSL - the title keeps the accent saturated, the body text and both backgrounds become desaturated, darker shades of the same hue. The border is opt-in, the card fills the width it is rendered into, content wraps, and title, body and footer each take their own padding and alignment. The style setters patch the derived values rather than replacing them. Below truecolor support the backgrounds are dropped and the card renders as accented text, because the derived shades would collapse onto one ANSI-16 color.
+- `Color::to_rgb` returns the 24-bit value of any color: named colors and palette indices resolve through the standard xterm palette (fixed table, 6x6x6 cube, grayscale ramp). `Color::Reset` has no fixed value and returns `None`.
+- `width::wrap_line` and `width::truncate_line` are style-preserving counterparts to `wrap` and `truncate`. They keep each span's style and hyperlink, and a word straddling a span boundary stays whole instead of being wrapped apart.
 - `core::command::split_command` splits a configured command line into an argument vector, honoring single and double quotes. Written by hand rather than pulling in a crate, keeping the dependency set unchanged.
 
 ### Fixed
