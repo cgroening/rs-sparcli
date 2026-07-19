@@ -20,6 +20,7 @@ fn main() -> Result<()> {
     sections()?;
     alerts()?;
     panels()?;
+    cards()?;
     tables()?;
     lists_and_trees()?;
     key_values_and_badges()?;
@@ -97,6 +98,34 @@ fn panels() -> Result<()> {
         .content_align(Align::Center)
         .fill(Style::new().bg(Color::Indexed(236)))
         .width(40)
+        .print()?;
+    Ok(())
+}
+
+/// Cards: filled surfaces whose colors all come from one accent.
+fn cards() -> Result<()> {
+    section("Cards")?;
+    Card::new("Every tone is derived from the theme accent.")
+        .title("Default")
+        .width(52)
+        .print()?;
+    println!();
+    Card::new("A single accent sets title, surface, text and border.")
+        .title("Derived from one color")
+        .footer("border and footer, same accent")
+        .accent(Color::from_hex("#a6e3a1").unwrap_or(Color::Green))
+        .border(BorderType::Rounded)
+        .width(52)
+        .print()?;
+    println!();
+    Card::new("Centered, flat title, wider padding.")
+        .title("Flat")
+        .accent(Color::from_hex("#f9e2af").unwrap_or(Color::Yellow))
+        .flat_title()
+        .title_align(Align::Center)
+        .content_align(Align::Center)
+        .padding(Edges::symmetric(1, 3))
+        .width(52)
         .print()?;
     Ok(())
 }

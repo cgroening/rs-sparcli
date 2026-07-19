@@ -6,6 +6,7 @@
 //! terminal conversions live in a dedicated submodule.
 
 mod color;
+pub(crate) mod hsl;
 
 pub use self::color::Color;
 

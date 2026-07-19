@@ -103,6 +103,32 @@ impl Color {
         Some(Self::Rgb(r, g, b))
     }
 
+    /// Returns the 24-bit RGB value of this color, if it has one.
+    ///
+    /// Named colors and palette indices resolve through the standard xterm
+    /// palette: slots 0-15 from a fixed table, 16-231 from the 6x6x6 color
+    /// cube, 232-255 from the grayscale ramp. [`Color::Reset`] adopts the
+    /// terminal's default color and therefore has no fixed value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sparcli::Color;
+    ///
+    /// assert_eq!(Color::Rgb(1, 2, 3).to_rgb(), Some((1, 2, 3)));
+    /// assert_eq!(Color::LightRed.to_rgb(), Some((255, 0, 0)));
+    /// assert_eq!(Color::Indexed(196).to_rgb(), Some((255, 0, 0)));
+    /// assert_eq!(Color::Reset.to_rgb(), None);
+    /// ```
+    pub fn to_rgb(self) -> Option<(u8, u8, u8)> {
+        match self {
+            Self::Reset => None,
+            Self::Rgb(r, g, b) => Some((r, g, b)),
+            Self::Indexed(index) => Some(indexed_to_rgb(index)),
+            named => ansi_index(named).map(|i| ANSI16_RGB[i as usize]),
+        }
+    }
+
     /// Resolves the color for the given support level.
     ///
     /// Returns `None` when nothing should be emitted (no-color terminals or
@@ -148,6 +174,86 @@ impl Color {
             other => other.to_crossterm(),
         }
     }
+}
+
+/// Standard xterm RGB values of the sixteen named colors, by palette index.
+const ANSI16_RGB: [(u8, u8, u8); 16] = [
+    (0x00, 0x00, 0x00), // 0  Black
+    (0x80, 0x00, 0x00), // 1  Red
+    (0x00, 0x80, 0x00), // 2  Green
+    (0x80, 0x80, 0x00), // 3  Yellow
+    (0x00, 0x00, 0x80), // 4  Blue
+    (0x80, 0x00, 0x80), // 5  Magenta
+    (0x00, 0x80, 0x80), // 6  Cyan
+    (0xc0, 0xc0, 0xc0), // 7  Gray
+    (0x80, 0x80, 0x80), // 8  DarkGray
+    (0xff, 0x00, 0x00), // 9  LightRed
+    (0x00, 0xff, 0x00), // 10 LightGreen
+    (0xff, 0xff, 0x00), // 11 LightYellow
+    (0x00, 0x00, 0xff), // 12 LightBlue
+    (0xff, 0x00, 0xff), // 13 LightMagenta
+    (0x00, 0xff, 0xff), // 14 LightCyan
+    (0xff, 0xff, 0xff), // 15 White
+];
+
+/// The six per-channel levels of the 6x6x6 color cube (indices 16-231).
+const CUBE_LEVELS: [u8; 6] = [0, 95, 135, 175, 215, 255];
+/// First palette index of the color cube.
+const CUBE_START: u8 = 16;
+/// First palette index of the grayscale ramp.
+const GRAY_START: u8 = 232;
+/// Value of the darkest grayscale ramp entry.
+const GRAY_BASE: u8 = 8;
+/// Value step between two grayscale ramp entries.
+const GRAY_STEP: u8 = 10;
+
+/// Returns the palette index of a named color, or `None` for the other
+/// variants. Inverse of [`indexed_to_named`] for the range 0-15.
+fn ansi_index(color: Color) -> Option<u8> {
+    let index = match color {
+        Color::Black => 0,
+        Color::Red => 1,
+        Color::Green => 2,
+        Color::Yellow => 3,
+        Color::Blue => 4,
+        Color::Magenta => 5,
+        Color::Cyan => 6,
+        Color::Gray => 7,
+        Color::DarkGray => 8,
+        Color::LightRed => 9,
+        Color::LightGreen => 10,
+        Color::LightYellow => 11,
+        Color::LightBlue => 12,
+        Color::LightMagenta => 13,
+        Color::LightCyan => 14,
+        Color::White => 15,
+        _ => return None,
+    };
+    Some(index)
+}
+
+/// Maps a 256-color index to its RGB value.
+fn indexed_to_rgb(index: u8) -> (u8, u8, u8) {
+    if index < CUBE_START {
+        return ANSI16_RGB[index as usize];
+    }
+    if index >= GRAY_START {
+        let level = GRAY_BASE + (index - GRAY_START) * GRAY_STEP;
+        return (level, level, level);
+    }
+    cube_to_rgb(index - CUBE_START)
+}
+
+/// Maps an offset into the 6x6x6 color cube to its RGB value.
+fn cube_to_rgb(offset: u8) -> (u8, u8, u8) {
+    const PLANE: u8 = 36;
+    const ROW: u8 = 6;
+    let level = |step: u8| CUBE_LEVELS[step as usize];
+    (
+        level(offset / PLANE),
+        level((offset / ROW) % ROW),
+        level(offset % ROW),
+    )
 }
 
 /// Maps an RGB triple to the closest of the sixteen named colors.
@@ -228,6 +334,46 @@ mod tests {
     #[test]
     fn none_support_emits_no_color() {
         assert_eq!(Color::Red.resolve(ColorSupport::None), None);
+    }
+
+    #[test]
+    fn to_rgb_maps_named_colors_to_the_xterm_palette() {
+        assert_eq!(Color::Black.to_rgb(), Some((0, 0, 0)));
+        assert_eq!(Color::Gray.to_rgb(), Some((192, 192, 192)));
+        assert_eq!(Color::LightRed.to_rgb(), Some((255, 0, 0)));
+    }
+
+    #[test]
+    fn to_rgb_resolves_the_color_cube() {
+        assert_eq!(Color::Indexed(16).to_rgb(), Some((0, 0, 0)));
+        assert_eq!(Color::Indexed(196).to_rgb(), Some((255, 0, 0)));
+        assert_eq!(Color::Indexed(231).to_rgb(), Some((255, 255, 255)));
+    }
+
+    #[test]
+    fn to_rgb_resolves_the_grayscale_ramp() {
+        assert_eq!(Color::Indexed(232).to_rgb(), Some((8, 8, 8)));
+        assert_eq!(Color::Indexed(255).to_rgb(), Some((238, 238, 238)));
+    }
+
+    #[test]
+    fn to_rgb_passes_truecolor_through() {
+        assert_eq!(Color::Rgb(1, 2, 3).to_rgb(), Some((1, 2, 3)));
+    }
+
+    #[test]
+    fn reset_has_no_rgb_value() {
+        assert_eq!(Color::Reset.to_rgb(), None);
+    }
+
+    #[test]
+    fn low_indices_agree_with_the_named_downgrade() {
+        // `ANSI16_RGB`/`ansi_index` and `indexed_to_named` describe the same
+        // sixteen slots; this pins them together instead of relying on a
+        // "keep in sync" comment.
+        for index in 0..16u8 {
+            assert_eq!(ansi_index(indexed_to_named(index)), Some(index));
+        }
     }
 
     #[test]

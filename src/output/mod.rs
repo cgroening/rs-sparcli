@@ -6,6 +6,7 @@
 
 pub mod alert;
 pub mod badge;
+pub mod card;
 pub mod columns;
 pub mod compose;
 pub mod diff;
