@@ -118,7 +118,7 @@ fn storage() -> &'static RwLock<Theme> {
 
 /// Returns a clone of the current theme.
 pub fn theme() -> Theme {
-    // Recover from a poisoned lock instead of panicking (Style Guide §7.3).
+    // Recover from a poisoned lock instead of panicking
     match storage().read() {
         Ok(guard) => guard.clone(),
         Err(poisoned) => poisoned.into_inner().clone(),

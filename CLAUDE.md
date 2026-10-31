@@ -23,7 +23,7 @@ There is a parallel Python version of `sparcli` at `/Users/cgroening/Developer/P
 - Rust needs `core/private_file.rs` for owner-only file creation; Python gets the same guarantees from `tempfile.mkstemp` and keeps no counterpart module.
 - Rust decodes keys via `crossterm`, so it has no equivalent of Python's `input/keydecode.py`.
 
-## Architecture (separate layers strictly, §2.6/§7.2)
+## Architecture (separate layers strictly)
 
 - `core/` – foundation: style, text, markup, theme, border, geometry, width, terminal, render, `command` (quote-aware splitting and env resolution for `$EDITOR`/`$PAGER`), `inplace` (in-place redraw engine), `private_file` (owner-only file creation). No widget logic.
 - `output/` – printable widgets, implement `Renderable`. `box_draw` holds the frame geometry shared by `Panel` and `Alert`.
@@ -42,65 +42,41 @@ Where a rule applies in more than one widget it lives in exactly one place. Do n
 - `core::command::resolve_from_env` / `program_and_args` for external commands.
 - `input::editor::edit_text_suspended` for the `$EDITOR` handover.
 
-## Output streams (§1.6)
+## Output streams
 
-sparcli is a library, not a CLI program, so §1.6 binds it only through what it prints:
+sparcli is a library, not a CLI program, so the CLI output rules bind it only through what it prints:
 
 - Payload goes to **stdout**, progress indicators to **stderr**, and progress draws only when stderr is a terminal. `InPlace::progress()` is the seam.
 - `print`/`print_to` do **not** truncate when stdout is not a terminal: they lay out at `UNCONSTRAINED_WIDTH`, because clipping to an invented width loses piped data silently. An explicit `render(max_width)` still truncates – that width is the caller's decision.
-- §1.7 (TUI) rules – scrollbar on overflow, a `?` overlay in every prompt, `Ctrl+Q` – are deliberately **not** implemented. They govern terminal UIs, not a CLI output library.
+- TUI rules – scrollbar on overflow, a `?` overlay in every prompt, `Ctrl+Q` – are deliberately **not** implemented. They govern terminal UIs, not a CLI output library.
 
 ## Dependencies & Feature Flags
 
 - Default (always): `crossterm`, `unicode-width`, `thiserror`, `log`.
 - Opt-in: `markup`, `fuzzy` (`nucleo-matcher`), `pager`.
-- New dependencies **must be agreed with the user beforehand** (§7.7).
+- New dependencies **must be agreed with the user beforehand**.
 - Established crates with `// https://crates.io/crates/<name>` above the `use`.
 - **Logging:** only the `log` facade and only as `warn!`/`debug!` at places where a `Result` would otherwise be silently swallowed (e.g. terminal restore in the `TerminalGuard`, history save/load, temp cleanup). No `error!` logs – real errors come back via `SparcliError` (no double logging); do not ship a logger/ backend (the app decides); nothing in hot paths/render loops.
 
-## Error Handling (§7.3) – very important, robust & long-lived
+## Errors
 
-- No `unwrap()`; `expect()` only at provably infallible places with a justification. No `panic!` in normal operation.
-- Errors via `Result<T, E>` + `?`. Library errors as a `thiserror` enum (`SparcliError`), foreign errors via `#[from]`.
+- Library errors as a `thiserror` enum (`SparcliError`), foreign errors via `#[from]`.
 - Input prompts return `Outcome<T>` (`Submitted` / `Cancelled`).
 - `TerminalGuard` (RAII) restores the terminal on drop/error/panic.
-- Defensive: safeguard inputs/edge cases, prefer to fail in a controlled way.
-
-## Clean Code (§1, §2.5) – key points
-
-- SRP for functions/structs; keep functions small.
-- **≤ 3 function parameters**; more → bundle into a struct/opts.
-- Early returns (guard clauses), max. 2 nesting levels.
-- SLAP (one abstraction level per function); no flag arguments.
-- No magic numbers/strings → named constants.
-- Strong typing: `enum`s instead of magic strings, `struct`s instead of tuples.
-- Lookup tables instead of large `match` for constant mappings.
 
 ## Style & Tooling
 
-- Edition 2024. `cargo fmt` (rustfmt.toml: max_width 80).
+- `rustfmt.toml` sets `max_width = 80`; `#![warn(missing_docs)]` is on.
 - `cargo clippy --all-targets -- -D warnings` must be clean.
-- 80-character code lines; straight quotes.
-- **No em dash** as a dash: in code files use the hyphen, in `.md` files use the en dash `–`.
-- rustdoc on every public item, module `//!`; `# Examples`/`# Errors`/ `# Panics` where applicable; `#![warn(missing_docs)]`.
 
-## Appearance (§7.10)
+## Appearance
 
 - Muted appearance, one accent tone, `dim` for secondary text.
 - Default border `Rounded`; truncate overflow with `…`.
 - Glyphs in two tiers (Unicode + ASCII fallback), selectable via the theme.
 - Selection lists navigate cyclically; respect `NO_COLOR`/non-TTY.
 
-## Tests (§2.8/§7.8) – mandatory
+## Tests
 
-- Unit tests in `#[cfg(test)] mod tests` per file; integration in `tests/`.
-- Test names describe the expected behavior; fakes over mocks.
 - Output: render to `Rendered` and check content/style (no TTY).
 - Input: drive headless via an `EventSource` fake (scripted keys).
-- **Run all tests after every change** (`cargo test`).
-- Doctests in `# Examples` count as tests and must run.
-
-## Docs/Maintenance
-
-- On changes, keep README/rustdoc and tests in sync.
-- Remove dead/commented-out code; fix the cause instead of the symptom.

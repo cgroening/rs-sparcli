@@ -12,29 +12,29 @@ Changes made:
 - `input/text.rs` (712) → `text/{mod,render,keys,suggest}.rs`.
 - `input/datepicker.rs` (488) → `datepicker/{mod,date}.rs`.
 - `core/style.rs` (384) → `style/{mod,color}.rs`.
-- 28 rustdoc violations (missing blank line after `# Errors`/`# Examples`, §8.4) in 16 files fixed.
+- 28 rustdoc violations (missing blank line after `# Errors`/`# Examples`) in 16 files fixed.
 - Stale `#[allow(dead_code)]` in `input/event.rs` removed (used by tests).
 - `API.md` and `CHANGELOG.md` synchronized (eval removal).
 
 Deliberate non-changes (KISS, "when in doubt, leave it"):
 - `panel` (326), `list` (309), `select` (402), `fuzzy` (385): each one coherent responsibility just above the ~300 signal threshold – no clarity gain from further splitting.
 - The supposed `spinner.rs` 80-column finding was a byte-vs-character artifact (rustfmt counts characters; no real violation).
-- Render helpers with 4-7 parameters remain – situational values (buffers, widths, styles), which §2.5 explicitly allows as explicit parameters, no object state.
+- Render helpers with 4-7 parameters remain – situational values (buffers, widths, styles), which may stay explicit parameters, no object state.
 - `pub mod` breadth of the widget modules left unchanged (narrowing to `pub(crate)` would break documented module paths – open item for later).
 
 ## Context
 
 The repo is stable and clean after several feature rounds (`cargo fmt` green, `cargo clippy --all-targets --all-features -- -D warnings` green, ~165 unit tests + integration, `#![warn(missing_docs)]` crate-wide, every module has a `//!` doc, no TODOs, only one justified local `#[allow(dead_code)]` in `input/event.rs`). `sparcli` is a **standalone** library without ratatui/async: its own renderer on `crossterm`, `unicode-width`, `thiserror` as default deps; `markup`, `fuzzy` (`nucleo-matcher`) and `pager` as opt-in feature flags. There are no extracted crates – everything lives here.
 
-Ordering principle: first establish a baseline, then layer by layer from `core` (the foundation) outward to `output`/`input` (this way understanding builds up bottom-up and each layer is checked according to its dependencies), finally the crate root and a cross-cutting pass. The dependency direction is strictly `output`/`input` → `core`, never cyclic (CLAUDE.md §2.6/§7.2).
+Ordering principle: first establish a baseline, then layer by layer from `core` (the foundation) outward to `output`/`input` (this way understanding builds up bottom-up and each layer is checked according to its dependencies), finally the crate root and a cross-cutting pass. The dependency direction is strictly `output`/`input` → `core`, never cyclic (CLAUDE.md, Architecture).
 
 ## Generic checkpoints (apply to EVERY module)
 
-When going through each file, check each time (CLAUDE.md §1, §2, §7):
+When going through each file, check each time:
 - **Names:** predicates `is_/has_/can_`; methods = verbs, types = nouns; no `Manager/Helper/Data` catch-all names; no negative booleans.
 - **Functions:** SLAP (one abstraction level), max. 2 nesting levels with early return, ≤ 3 parameters (otherwise struct/opts), no flag arguments, command-query separation.
 - **Visibility:** as private as possible; `pub` only where actually used (re-exports via `mod.rs`/`lib.rs` control the public surface).
-- **Errors:** `Result`/`?`, no `unwrap/expect/panic` in the normal flow; every `expect` at a provably infallible place justified (CLAUDE.md §7.3).
+- **Errors:** `Result`/`?`, no `unwrap/expect/panic` in the normal flow; every `expect` at a provably infallible place justified.
 - **Magic numbers/strings:** replaced by named constants/`enum`s; lookup tables instead of large `match` for constant mappings.
 - **Hygiene:** no dead/commented-out code; comments explain the *why*; rustdoc up to date on every public item (`# Examples`/`# Errors`/ `# Panics` where applicable); 80 columns; straight quotes; in code no em dash (hyphen), in `.md` the en dash `–`.
 - **Tests:** logic-bearing code has tests in `#[cfg(test)] mod tests`; test names describe the expected behavior; doctests in `# Examples` run.
@@ -126,6 +126,6 @@ After each layer and at the end: `cargo fmt --check` + `cargo clippy --all-targe
 ## Notes / non-goals
 
 - **Scope boundaries (CLAUDE.md):** output complete, input only single widgets – no Form/App/Args/Serde/logging, fuzzy only as inline select. None of this to be "retrofitted" during cleanup.
-- **No async, no ratatui:** a lean footprint is the guiding vision – no new dependencies without prior agreement (CLAUDE.md §7.7).
+- **No async, no ratatui:** a lean footprint is the guiding vision – no new dependencies without prior agreement.
 - **Unified theme:** `core/theme.rs` applies to input AND output – do not split.
-- KISS/YAGNI before "my style": respect the local style, only touch what the task requires, separate refactoring from behavior (CLAUDE.md §3).
+- KISS/YAGNI before "my style": respect the local style, only touch what the task requires, separate refactoring from behavior.
