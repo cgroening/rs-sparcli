@@ -40,7 +40,7 @@ impl Pager {
 
     /// Overrides the pager command.
     ///
-    /// Split with [`split_command`](crate::core::command::split_command), so a
+    /// Split with [`split_command`](crate::command::split_command), so a
     /// quoted path containing spaces survives; never passed to a shell.
     #[must_use]
     pub fn command(mut self, command: impl Into<String>) -> Self {

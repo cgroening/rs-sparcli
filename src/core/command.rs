@@ -19,6 +19,22 @@ use crate::error::{Result, SparcliError};
 ///
 /// `code --wait` splits into two arguments; `"/Applications/Sublime Text/subl"`
 /// stays a single one; `vi "unterminated` yields `None`.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::command::split_command;
+///
+/// let argv = split_command(r#""/Applications/Sublime Text/subl" --wait"#);
+/// assert_eq!(
+///     argv,
+///     Some(vec![
+///         "/Applications/Sublime Text/subl".to_string(),
+///         "--wait".to_string(),
+///     ]),
+/// );
+/// assert_eq!(split_command(r#"vi "unterminated"#), None);
+/// ```
 #[must_use]
 pub fn split_command(command: &str) -> Option<Vec<String>> {
     let mut parts: Vec<String> = Vec::new();
@@ -69,6 +85,20 @@ pub fn split_command(command: &str) -> Option<Vec<String>> {
 /// variable, then `default`. Blank and whitespace-only values are treated as
 /// unset throughout, so `EDITOR=""` falls through instead of yielding an
 /// unusable empty command.
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::command::resolve_from_env;
+///
+/// // An explicit override wins over the environment and the default.
+/// let command = resolve_from_env(Some("nano"), &["VISUAL", "EDITOR"], "vi");
+/// assert_eq!(command, "nano");
+///
+/// // A blank override counts as unset.
+/// let command = resolve_from_env(Some("  "), &[], "vi");
+/// assert_eq!(command, "vi");
+/// ```
 #[must_use]
 pub fn resolve_from_env(
     override_command: Option<&str>,
@@ -99,7 +129,20 @@ pub fn resolve_from_env(
 ///
 /// Returns [`SparcliError::Config`] if `command` has an unbalanced quote or
 /// contains no program at all.
-pub(crate) fn program_and_args(
+///
+/// # Examples
+///
+/// ```
+/// use sparcli::command::program_and_args;
+///
+/// let (program, args) = program_and_args("code --wait", "editor")?;
+/// assert_eq!(program, "code");
+/// assert_eq!(args, ["--wait"]);
+///
+/// assert!(program_and_args("   ", "editor").is_err());
+/// # Ok::<(), sparcli::SparcliError>(())
+/// ```
+pub fn program_and_args(
     command: &str,
     label: &str,
 ) -> Result<(String, Vec<String>)> {

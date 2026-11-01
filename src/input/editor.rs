@@ -17,13 +17,17 @@ use crate::error::Result;
 ///
 /// `command` overrides the editor; otherwise `$VISUAL`, then `$EDITOR`, then a
 /// platform default is used. The command is split with
-/// [`split_command`](crate::core::command::split_command), so a quoted path
+/// [`split_command`](crate::command::split_command), so a quoted path
 /// containing spaces survives; it is never passed to a shell.
 ///
 /// # Errors
 ///
 /// Returns [`SparcliError::Io`] if the editor cannot be spawned, or
-/// [`SparcliError::Config`] if the resolved command is empty.
+/// [`SparcliError::Config`] if the resolved command is empty or has an
+/// unbalanced quote.
+///
+/// [`SparcliError::Io`]: crate::SparcliError::Io
+/// [`SparcliError::Config`]: crate::SparcliError::Config
 pub fn edit_file(command: Option<&str>, path: &Path) -> Result<()> {
     let resolved = resolve_command(command);
     let (program, args) = program_and_args(&resolved, "editor")?;

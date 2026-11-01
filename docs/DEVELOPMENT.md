@@ -90,7 +90,7 @@ examples/   Runnable demos (output_gallery, output_dynamic, prompts,
 tests/      End-to-end tests over the public API.
 ```
 
-The `core`/`input`/`output` module tree is `pub(crate)`; the public API is the curated set re-exported at the crate root plus the facade modules `sparcli::{markup, validate, event, shortcut, width, terminal}` and `prelude`.
+The `core`/`input`/`output` module tree is `pub(crate)`; the public API is the curated set re-exported at the crate root plus the facade modules `sparcli::{markup, validate, event, shortcut, width, terminal, command}` and `prelude`.
 
 Dependency direction is one-way: `output` and `input` depend on `core`, never the reverse. `sparcli` never depends on `ratatui`.
 

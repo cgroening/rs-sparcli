@@ -101,6 +101,9 @@ impl NumberInput {
     ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
+    ///
+    /// [`SparcliError::NoTerminal`]: crate::SparcliError::NoTerminal
+    /// [`SparcliError::Io`]: crate::SparcliError::Io
     pub fn run(self) -> Result<Outcome<f64>> {
         run_interactive(|source| self.run_with(source))
     }

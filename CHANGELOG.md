@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-01
+
+### Added
+
+- `BorderChars` is exported at the crate root and in the prelude. `BorderType::chars` returned it since 0.4.0, but the type could not be named outside the crate.
+- `terminal::Stream`, `terminal::is_error_tty`, `terminal::output_width` and `terminal::UNCONSTRAINED_WIDTH` are reachable through the `terminal` module.
+- A `command` module exports `split_command`, `resolve_from_env` and `program_and_args`, the command line resolution and splitting behind `$EDITOR` and `$PAGER`, for applications that launch their own configured commands.
+
+### Fixed
+
+- The 0.4.0 entries for these helpers named paths under `core::` and `terminal::` that were not public. They are reachable now at the paths listed above.
+- 26 intra-doc links that were broken or pointed at private items on docs.rs, mostly the `SparcliError` variants in the prompts' `# Errors` sections. The crate now denies `rustdoc::broken_intra_doc_links` and `rustdoc::private_intra_doc_links`, so a broken link fails the documentation build.
+
 ## [0.4.0] - 2026-07-19
 
 ### Added
@@ -15,7 +28,7 @@ All notable changes to this project are documented here. The format is based on 
 - `core::command::split_command` splits a configured command line into an argument vector, honoring single and double quotes. Written by hand rather than pulling in a crate, keeping the dependency set unchanged.
 - `Rendered::plain_lines` returns the plain text of each line separately, the counterpart to `plain`. It replaces a test helper that had been copied into nine modules.
 - `terminal::is_error_tty`, `terminal::Stream` and `terminal::output_width` expose which stream a widget draws to and how wide printed output should be laid out.
-- `input::selection::SelectionCursor` is the single implementation of list cursor and scroll-window behaviour, shared by `Select` and `FuzzySelect`. `FuzzySelect` gains the `Home`, `End`, `PageUp` and `PageDown` keys that `Select` already had.
+- `input::selection::SelectionCursor` (internal, not part of the public API) is the single implementation of list cursor and scroll-window behaviour, shared by `Select` and `FuzzySelect`. `FuzzySelect` gains the `Home`, `End`, `PageUp` and `PageDown` keys that `Select` already had.
 - `core::command::resolve_from_env` and `core::command::program_and_args` hold the command resolution and argv splitting that `$EDITOR` and `$PAGER` had each implemented separately.
 
 ### Changed

@@ -120,6 +120,9 @@ impl FuzzySelect {
     ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
+    ///
+    /// [`SparcliError::NoTerminal`]: crate::SparcliError::NoTerminal
+    /// [`SparcliError::Io`]: crate::SparcliError::Io
     pub fn run(self) -> Result<Outcome<usize>> {
         let outcome = self.run_collect()?;
         Ok(match outcome {
@@ -138,6 +141,9 @@ impl FuzzySelect {
     ///
     /// Returns [`SparcliError::NoTerminal`] without an interactive terminal,
     /// or [`SparcliError::Io`] on a terminal failure.
+    ///
+    /// [`SparcliError::NoTerminal`]: crate::SparcliError::NoTerminal
+    /// [`SparcliError::Io`]: crate::SparcliError::Io
     pub fn run_multi(self) -> Result<Outcome<Vec<usize>>> {
         self.run_collect()
     }

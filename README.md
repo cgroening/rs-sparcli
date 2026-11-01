@@ -102,7 +102,7 @@ A card fills the width it is rendered into, wraps its content, and carries no bo
 
 Because the derived shades all collapse onto the same ANSI-16 color, a card drops its backgrounds below truecolor support and renders as accented text instead - readable everywhere, rather than an unreadable block.
 
-`BorderType::Tall` is the one border a card draws natively - a thin block frame around the filled surface, following the geometry of Textual's `wide` border:
+`BorderType::Tall` is the one border a card draws natively – a thin block frame around the filled surface, following the geometry of Textual's `wide` border:
 
 ```rust
 use sparcli::{BorderType, Card, Renderable};

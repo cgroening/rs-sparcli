@@ -153,3 +153,26 @@ fn an_explicit_render_width_still_truncates() {
     let text = strip_ansi(&table.render(40).plain());
     assert!(text.contains('…'), "an explicit width clips as before");
 }
+
+#[test]
+fn border_chars_is_nameable_from_outside_the_crate() {
+    let chars: sparcli::BorderChars = BorderType::Rounded.chars();
+    assert_eq!(chars.top_left, '╭');
+}
+
+#[test]
+fn terminal_stream_helpers_agree_with_the_tty_checks() {
+    use sparcli::terminal::{
+        Stream, UNCONSTRAINED_WIDTH, is_error_tty, is_output_tty, output_width,
+        term_width,
+    };
+
+    assert_eq!(Stream::Stdout.is_tty(), is_output_tty());
+    assert_eq!(Stream::Stderr.is_tty(), is_error_tty());
+    let expected = if is_output_tty() {
+        term_width()
+    } else {
+        UNCONSTRAINED_WIDTH
+    };
+    assert_eq!(output_width(), expected);
+}

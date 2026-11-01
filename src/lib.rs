@@ -37,13 +37,14 @@
 //! [`Renderable`]: crate::Renderable
 
 #![deny(missing_docs)]
+#![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
 
 pub(crate) mod core;
 pub(crate) mod error;
 pub(crate) mod input;
 pub(crate) mod output;
 
-pub use core::border::BorderType;
+pub use core::border::{BorderChars, BorderType};
 pub use core::geometry::{Align, Edges, Position, Title, VAlign};
 pub use core::render::{Renderable, Rendered};
 pub use core::style::{Attribute, Color, Modifier, Style};
@@ -123,14 +124,28 @@ pub mod width {
 /// Terminal capability and size detection.
 pub mod terminal {
     pub use crate::core::terminal::{
-        ColorSupport, color_support, is_input_tty, is_output_tty, term_height,
-        term_width, terminal_size,
+        ColorSupport, Stream, UNCONSTRAINED_WIDTH, color_support, is_error_tty,
+        is_input_tty, is_output_tty, output_width, term_height, term_width,
+        terminal_size,
+    };
+}
+
+/// External command resolution for `$EDITOR`/`$PAGER`-style settings.
+///
+/// A configured command is a command *line*, not a program name: these
+/// helpers resolve it from an override, the environment or a default, and
+/// split it into a program and its arguments while honoring quotes. The
+/// result is meant for [`std::process::Command`] and is never passed to a
+/// shell.
+pub mod command {
+    pub use crate::core::command::{
+        program_and_args, resolve_from_env, split_command,
     };
 }
 
 /// Commonly used types, re-exported for `use sparcli::prelude::*;`.
 pub mod prelude {
-    pub use crate::core::border::BorderType;
+    pub use crate::core::border::{BorderChars, BorderType};
     pub use crate::core::geometry::{Align, Edges, Position, Title, VAlign};
     pub use crate::core::render::{Renderable, Rendered};
     pub use crate::core::style::{Attribute, Color, Modifier, Style};
