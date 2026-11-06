@@ -64,7 +64,7 @@ impl Default for Table {
             header: true,
             header_style: theme.heading,
             striped: false,
-            stripe_style: Style::new().dim(),
+            stripe_style: theme.stripe,
             title: None,
             title_style: theme.heading,
             pad: 1,

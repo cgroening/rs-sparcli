@@ -55,6 +55,16 @@ pub struct Theme {
     pub selection: Style,
     /// Style for the text cursor block.
     pub cursor: Style,
+    /// Style for added lines in a diff.
+    pub diff_add: Style,
+    /// Style for removed lines in a diff.
+    pub diff_delete: Style,
+    /// Colour of the empty part of a progress bar.
+    pub progress_empty: Color,
+    /// Style for backtick code spans in markup.
+    pub code: Style,
+    /// Style for the shaded rows of a striped table.
+    pub stripe: Style,
     /// Default border type for boxes and panels.
     pub border: BorderType,
     /// Whether to use Unicode glyphs (`false` selects ASCII fallbacks).
@@ -77,6 +87,11 @@ impl Default for Theme {
             hint: Style::new().dim(),
             selection: Style::new().fg(accent).bold(),
             cursor: Style::new().fg(Color::Black).bg(accent),
+            diff_add: Style::new().fg(Color::Green),
+            diff_delete: Style::new().fg(Color::Red),
+            progress_empty: Color::DarkGray,
+            code: Style::new().fg(Color::Cyan),
+            stripe: Style::new().dim(),
             border: BorderType::Rounded,
             unicode: true,
         }

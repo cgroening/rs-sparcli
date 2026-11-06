@@ -228,9 +228,10 @@ fn parse_color(token: &str) -> Option<Color> {
     }
 }
 
-/// The style used for backtick code spans, layered on `base`.
+/// The style used for backtick code spans (the theme's `code`), layered on
+/// `base`.
 fn code_style(base: Style) -> Style {
-    base.patch(Style::new().fg(Color::Cyan))
+    base.patch(crate::core::theme::theme().code)
 }
 
 #[cfg(test)]

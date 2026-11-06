@@ -66,9 +66,25 @@ pub enum Color {
 impl Color {
     /// Parses a color name (case-insensitive), e.g. `"red"` or `"lightblue"`.
     ///
+    /// The `ansi:<name>` tokens of the ratada theme are accepted too
+    /// (`ansi:dark_gray`, `ansi:light_red`, …, where `ansi:white` is the bright
+    /// white), so one token names the same colour in every crate.
+    ///
     /// Returns `None` for unknown names; `#rrggbb` is handled by the caller.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sparcli::Color;
+    /// assert_eq!(Color::from_name("ansi:dark_gray"), Some(Color::DarkGray));
+    /// assert_eq!(Color::from_name("ansi:white"), Some(Color::White));
+    /// ```
     pub fn from_name(name: &str) -> Option<Self> {
-        let color = match name.trim().to_ascii_lowercase().as_str() {
+        let lower = name.trim().to_ascii_lowercase();
+        if let Some(ansi) = lower.strip_prefix("ansi:") {
+            return Self::from_ansi_name(ansi);
+        }
+        let color = match lower.as_str() {
             "reset" | "default" => Self::Reset,
             "black" => Self::Black,
             "red" => Self::Red,
@@ -86,6 +102,30 @@ impl Color {
             "lightmagenta" => Self::LightMagenta,
             "lightcyan" => Self::LightCyan,
             "brightwhite" => Self::White,
+            _ => return None,
+        };
+        Some(color)
+    }
+
+    /// The colour of a ratada `ansi:<name>` token name (without the prefix).
+    fn from_ansi_name(name: &str) -> Option<Self> {
+        let color = match name.replace("grey", "gray").as_str() {
+            "black" => Self::Black,
+            "red" => Self::Red,
+            "green" => Self::Green,
+            "yellow" => Self::Yellow,
+            "blue" => Self::Blue,
+            "magenta" => Self::Magenta,
+            "cyan" => Self::Cyan,
+            "gray" => Self::Gray,
+            "dark_gray" => Self::DarkGray,
+            "light_red" => Self::LightRed,
+            "light_green" => Self::LightGreen,
+            "light_yellow" => Self::LightYellow,
+            "light_blue" => Self::LightBlue,
+            "light_magenta" => Self::LightMagenta,
+            "light_cyan" => Self::LightCyan,
+            "white" => Self::White,
             _ => return None,
         };
         Some(color)

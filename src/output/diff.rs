@@ -1,7 +1,7 @@
 //! Colored unified diff rendering (line-based LCS).
 
 use crate::core::render::{Renderable, Rendered};
-use crate::core::style::{Color, Style};
+use crate::core::style::Style;
 use crate::core::text::Line;
 use crate::core::theme::theme;
 
@@ -50,8 +50,8 @@ impl Diff {
             no_header: false,
             old_label: "old".to_string(),
             new_label: "new".to_string(),
-            add_style: Style::new().fg(Color::Green),
-            del_style: Style::new().fg(Color::Red),
+            add_style: theme.diff_add,
+            del_style: theme.diff_delete,
             hunk_style: theme.secondary,
         }
     }

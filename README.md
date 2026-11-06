@@ -150,7 +150,7 @@ let theme = Theme {
 set_theme(theme);
 ```
 
-The same theme drives both output widgets and input prompts.
+The same theme drives both output widgets and input prompts. Every colour a widget draws comes from it: the accent, the message roles (`success`, `error`, `warning`, `info`, `debug`), `secondary`/`hint`, `selection`/`cursor`, and the widget styles `diff_add`, `diff_delete`, `progress_empty`, `code` and `stripe`. Colour names also accept ratada's `ansi:<name>` tokens.
 
 ## Examples
 

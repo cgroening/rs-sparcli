@@ -1,7 +1,6 @@
 //! Yes/no confirmation prompt.
 
 use crate::core::render::Rendered;
-use crate::core::style::Style;
 use crate::core::text::{Line, Span};
 use crate::core::theme::{Theme, theme};
 use crate::error::Result;
@@ -175,7 +174,7 @@ fn option_span(label: &str, selected: bool, theme: &Theme) -> Span {
     if selected {
         Span::styled(format!("[{label}]"), theme.selection)
     } else {
-        Span::styled(format!(" {label} "), Style::new().dim())
+        Span::styled(format!(" {label} "), theme.hint)
     }
 }
 

@@ -84,7 +84,7 @@ impl Default for ProgressBar {
             left_cap: String::new(),
             right_cap: String::new(),
             fill_color: theme.accent,
-            empty_color: Color::DarkGray,
+            empty_color: theme.progress_empty,
             thresholds: None,
             show_percent: true,
             show_value: false,
