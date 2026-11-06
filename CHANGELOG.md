@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-06
+
 ### Changed (breaking)
 
 - **`Theme` has five new fields for styles that were fixed in code:** `diff_add` and `diff_delete` (the diff's added/removed lines, default green/red), `progress_empty` (the empty part of a progress bar, default dark gray), `code` (backtick code spans in markup, default cyan) and `stripe` (the shaded rows of a striped table, default dim). `Diff`, `Progress`, the markup parser and `Table` read them, so an app can theme them; the defaults are the previous look. A `Theme` struct literal needs the fields or `..Theme::default()`.
